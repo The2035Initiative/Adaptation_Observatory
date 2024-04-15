@@ -1,0 +1,7 @@
+```{r}
+ggplot(penguins, aes(gender, age, fill = species)) +
+  geom_hdr(xlim = c(160, 240), ylim = c(30, 70)) +
+  geom_point(shape = 21) +
+  facet_wrap(vars(species))
+```
+
