@@ -82,7 +82,7 @@ bgd_demos
 #ind_demos <- read_n_wrangle_data(ind_responses)
 ind_demos
 ```
-```{r region_gender_age, fig.height=10, fig.width=22}
+```{r grouped_data, fig.height=10, fig.width=22}
 # Grouping the data by region
 grouped_data <- ind_demos %>%
   group_by(region) %>%
@@ -103,10 +103,96 @@ grouped_data <- grouped_data %>%
            stay_residence, enough_eat, move_rural_urban, demo_income) %>%
   summarise(number_of_surveys_submitted = n()) %>%
   ungroup()
+```
+ 
+# function
+```{r fig.height=11, fig.width=22}
+generate_treemap_plots <- function(data, parameter) {
+  # Define a color palette
+  #colors <-   colorRampPalette(rev(brewer.pal(11, "Set3")))(50)
+  colors <- rev(brewer.pal(11, 'Set3'))
 
+  
+  # Create a list to store the plots
+  plots <- list()
+  
+  # Iterate through the parameters
+  for (param in parameter) {
+    # Create the treemap
+    plot <- treemap(data,
+                    index = c("region", "gender", "age", param),
+                    vSize = "number_of_surveys_submitted",
+                    algorithm = "squarified",
+                    title = paste("India Survey Response:", param, "by Region, Gender, and Age"),
+                    palette = colors,
+                    
+                    # Increase the font size of the title
+                    fontsize.title = 45,   
+                    
+                    # Font size for labels
+                    fontsize.labels = c(35, 20, 18, 15),  
+                    
+                    # Set text color to white for all levels
+                    fontcolor.labels = c("black", "grey20", "white"), 
+                    
+                    # Bold the parameter label
+                    fontface.labels = c("bold", "plain", "plain", "bold"),  
+                    
+                    # Set border color to white for better visibility
+                    border.col = "white", 
+                   
+                    # Adjust line size (border width) as needed 
+                    border.lw = 2,  
+                    
+                    # Align labels to center
+                    align.labels = list(c("center", "center", "center", "center")), 
+                    
+                    # Adjust overlap for better readability
+                    overlap.labels = 0,  
+                    
+                    # Set background color of labels to transparent
+                    #bg.labels = "transparent", 
+                    
+                    # Add a margin (top, right, bottom, left)
+                    margin = c(20, 20, 20, 20), 
+                    
+                    # Font size for background labels
+                    fontsize.labels.bg = c(16, 14),
+                   
+                    width = 800,  # Specify the width of the plot
+        
+                    height = 600  # Specify the height of the plot
+
+                  
+    )
+    
+    # Append the plot to the list
+    plots[[param]] <- plot
+  }
+  
+  return(plots)
+}
+
+# Define the parameters to iterate through
+parameters <- c("flood_year", "housing_damage", "property_loss", "contact_authority", "flood_close", 
+                "flood_prepared", "stay_residence", "enough_eat", "move_rural_urban", "demo_income")
+
+# Generate treemap plots for each parameter
+plots_collection <- generate_treemap_plots(grouped_data, parameters)
+```
+
+
+
+
+
+
+
+
+
+```{r region_gender_age, fig.height=11, fig.width=22}
 # Define a color palette
 library(RColorBrewer)
-colors <- brewer.pal(11, 'Set3') # You can choose any color palette from RColorBrewer 
+colors <- rev(brewer.pal(11, 'Set3')) # You can choose any color palette from RColorBrewer 
 brewer.pal.info
 
 # Create the treemap with the specified color palette
@@ -127,7 +213,7 @@ treemap(grouped_data,
         # Align labels to center
         align.labels = list(c("center", "center")),  
         # Adjust overlap for better readability
-        overlap.labels = 1,
+        overlap.labels = 0,
         # Add a margin (top, right, bottom, left)
         margin = c(20, 20, 20, 20),
         
@@ -138,6 +224,8 @@ treemap(grouped_data,
         
         )
 ```
+
+
 ```{r char_tree fig.height=11, fig.width=25}
 # Define a color palette
 library(RColorBrewer)
@@ -162,6 +250,8 @@ treemap(grouped_data,
         )
 
 ```
+
+
 ```{r gender_age, fig.height=11, fig.width=25}
 # Define a color palette
 library(RColorBrewer)
@@ -185,175 +275,3 @@ treemap(grouped_data,
         border.lwds = 1.5
         )
 ```
-```{r flood_year, fig.height=11, fig.width=25}
-# Create the treemap with improved labels, layout, and margin
-treemap(grouped_data,
-        index=c("region", "gender", "age", "flood_year"),
-        vSize="number_of_surveys_submitted",
-        algorithm="squarified",
-        title="India Survey Response: Region, Gender, Age and Flood Year",
-        palette=colors,
-        fontsize.title = 40,   # Increase the font size of the title
-        fontsize.labels = c(27, 20, 18),  # Font size for region titles and other labels
-        border.col = "white",  # Set border color to white for better visibility
-        align.labels = list(c("center", "center")),  # Align labels to center
-        overlap.labels = 0,  # Adjust overlap for better readability
-        bg.labels = "transparent",  # Set background color of labels to transparent
-        margin = c(20, 20, 20, 20),  # Add a margin (top, right, bottom, left)
-        fontsize.labels.bg = c(16, 14),  # Font size for background labels
-        border.lwds = 1.5
-        )
-```
-
-```{r housing_damage, fig.height=11, fig.width=25}
-# Create the treemap with improved labels, layout, and margin
-treemap(grouped_data,
-        index=c("region", "gender", "age", "housing_damage"),
-        vSize="number_of_surveys_submitted",
-        algorithm="squarified",
-        title="India Survey Response: Region, Gender, Age and Housing Damage",
-        palette=colors,
-        fontsize.title = 40,   # Increase the font size of the title
-        fontsize.labels = c(27, 20, 18),  # Font size for region titles and other labels
-        border.col = "white",  # Set border color to white for better visibility
-        align.labels = list(c("center", "center")),  # Align labels to center
-        overlap.labels = 0,  # Adjust overlap for better readability
-        bg.labels = "transparent",  # Set background color of labels to transparent
-        margin = c(20, 20, 20, 20),  # Add a margin (top, right, bottom, left)
-        fontsize.labels.bg = c(16, 14),  # Font size for background labels
-        border.lwds = 1.5
-        )
-```
-
-```{r property_loss, fig.height=11, fig.width=25}
-# Create the treemap with improved labels, layout, and margin
-treemap(grouped_data,
-        index=c("region", "gender", "age", "property_loss"),
-        vSize="number_of_surveys_submitted",
-        algorithm="squarified",
-        title="India Survey Response: Region, Gender, Age and Property Loss",
-        palette=colors,
-        fontsize.title = 40,   # Increase the font size of the title
-        fontsize.labels = c(27, 20, 18),  # Font size for region titles and other labels
-        border.col = "white",  # Set border color to white for better visibility
-        align.labels = list(c("center", "center")),  # Align labels to center
-        overlap.labels = 0,  # Adjust overlap for better readability
-        bg.labels = "transparent",  # Set background color of labels to transparent
-        margin = c(20, 20, 20, 20),  # Add a margin (top, right, bottom, left)
-        fontsize.labels.bg = c(16, 14),  # Font size for background labels
-        border.lwds = 1.5
-        )
-```
-                
-```{r contact_authorities, fig.height=11, fig.width=25}
-# Create the treemap with improved labels, layout, and margin
-treemap(grouped_data,
-        index=c("region", "gender", "age", "contact_authority"),
-        vSize="number_of_surveys_submitted",
-        algorithm="squarified",
-        title="India Survey Response: Region, Gender, Age and Contact Authorities",
-        palette=colors,
-        fontsize.title = 40,   # Increase the font size of the title
-        fontsize.labels = c(27, 20, 18),  # Font size for region titles and other labels
-        border.col = "white",  # Set border color to white for better visibility
-        align.labels = list(c("center", "center")),  # Align labels to center
-        overlap.labels = 0,  # Adjust overlap for better readability
-        bg.labels = "transparent",  # Set background color of labels to transparent
-        margin = c(20, 20, 20, 20),  # Add a margin (top, right, bottom, left)
-        fontsize.labels.bg = c(16, 14),  # Font size for background labels
-        border.lwds = 1.5
-        )
-```
-```{r flood_close, fig.height=11, fig.width=25}
-# Create the treemap with improved labels, layout, and margin
-treemap(grouped_data,
-        index=c("region", "gender", "age", "flood_close"),
-        vSize="number_of_surveys_submitted",
-        algorithm="squarified",
-        title="India Survey Response: Region, Gender, Age and Flood Close",
-        palette=colors,
-        fontsize.title = 40,   # Increase the font size of the title
-        fontsize.labels = c(27, 20, 18),  # Font size for region titles and other labels
-        border.col = "white",  # Set border color to white for better visibility
-        align.labels = list(c("center", "center")),  # Align labels to center
-        overlap.labels = 0,  # Adjust overlap for better readability
-        bg.labels = "transparent",  # Set background color of labels to transparent
-        margin = c(20, 20, 20, 20),  # Add a margin (top, right, bottom, left)
-        fontsize.labels.bg = c(16, 14),  # Font size for background labels
-        border.lwds = 1.5
-        )
-```
- flood_prepared, housing_safe, enough_eat, move_rural_urban, demo_income, 
-                # sentiments 
-                climate_problem, trust_government) 
-```{r stay_residence, fig.height=11, fig.width=25}
-# Create the treemap with improved labels, layout, and margin
-treemap(grouped_data,
-        index=c("region", "gender", "age", "stay_residence"),
-        vSize="number_of_surveys_submitted",
-        algorithm="squarified",
-        title="India Survey Response: Region, Gender, Age and Stay Residence",
-        palette=colors,
-        fontsize.title = 40,   # Increase the font size of the title
-        fontsize.labels = c(27, 20, 18),  # Font size for region titles and other labels
-        border.col = "white",  # Set border color to white for better visibility
-        align.labels = list(c("center", "center")),  # Align labels to center
-        overlap.labels = 0,  # Adjust overlap for better readability
-        bg.labels = "transparent",  # Set background color of labels to transparent
-        margin = c(20, 20, 20, 20),  # Add a margin (top, right, bottom, left)
-        fontsize.labels.bg = c(16, 14),  # Font size for background labels
-        border.lwds = 1.5
-        )
-```
-```{r flood_prepared, fig.height=14, fig.width=35}
-# Create the treemap with improved labels, layout, and margin
-treemap(grouped_data,
-        index=c("region", "gender", "age", "flood_prepared"),
-        vSize="number_of_surveys_submitted",
-        algorithm="squarified",
-        title="India Survey Response: Region, Gender, Age and Flood Prepared",
-        palette=colors,
-        fontsize.title = 40,   # Increase the font size of the title
-        fontsize.labels = c(30, 25, 20),  # Font size for region titles and other labels
-        border.col = "white",  # Set border color to white for better visibility
-        align.labels = list(c("center", "center")),  # Align labels to center
-        overlap.labels = 0,  # Adjust overlap for better readability
-        bg.labels = "transparent",  # Set background color of labels to transparent
-        margin = c(20, 20, 20, 20),  # Add a margin (top, right, bottom, left)
-        fontsize.labels.bg = c(16, 14),  # Font size for background labels
-        border.lwds = 1.5
-        )
-```
-```{r gender_age_demo}
-# Create the treemap with the specified color palette
-
-grouped_data
-treemap(grouped_data,
-        index=c("region", "gender", "demo_gender", "age", "demo_age"#, "flood_year"#, "property_loss", "contact_authority", 
-               # "flood_close", "stay_residence", "enough_eat", "move_rural_urban", "demo_income
-               ),
-        vSize="number_of_surveys_submitted",
-        algorithm="squarified",
-        title="India Survey Response Categories: Region, Gender, and Age",
-        palette=colors,
-        # Increase the font size of the title
-        fontsize.title = 20,   
-         # Font size for region titles and other labels
-        fontsize.labels = c(16, 12), 
-        # Set border color to white for better visibility
-        border.col = "white",  
-        # Align labels to center
-        align.labels = list(c("center", "center")),  
-        # Adjust overlap for better readability
-        overlap.labels = 0.5,
-        # Add a margin (top, right, bottom, left)
-        margin = c(20, 0.02, 0.02, 10),
-        
-        fontsize.labels.bg = c(20, 20),  # Font size for background labels
-        
-         # Set background color of labels to transparent
-        fontsize.labels.bg = c(14, 12)  # Font size for background labels
-        
-        )
-```
-
