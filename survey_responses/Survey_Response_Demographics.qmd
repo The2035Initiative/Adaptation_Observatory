@@ -1,0 +1,786 @@
+---
+author: "Sofia Ingersoll"
+title: "Adaptation Observatory: Survey Response Demographics (Bangladesh & India)"
+date: 2024-4-14
+format:
+  html:
+    code-fold: true
+    code-summary: "Show the code"
+#embed-resources: true
+---
+
+## Set Up
+
+```{r message = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+
+#..........................load packages.........................
+library(tidyverse)        # load the tidyverse package to assist with data wrangling & cleaning 
+
+library(patchwork)        # load the patchwork package to assist in plot composition (displaying multiple data visualizations) 
+
+library(showtext)         # load the showtext to more easily use fonts
+library(here)
+
+library(leaflet)
+library(osmextract) 
+library(units)
+library(sf)
+library(sfheaders)
+library(sp)
+library(raster)
+library(tmap)
+library(terra)
+library(stars)
+library(ggtext)
+library(units)
+
+library(tidyverse)
+library(treemap)
+library(sunburstR)
+library(purrr)
+```
+
+
+## Load & Wrangle Survey Demographic Data
+```{r warning = FALSE}
+bgd_responses <- file.path(here("..","data","adapt_observ_survey_responses", "Observatory_Bangladesh_2024_04_15.csv"))
+  
+ind_responses <- file.path(here("..","data","adapt_observ_survey_responses", "Observatory_India_2024_04_15.csv"))
+
+# load function
+# Source the .R file containing the function
+source(here("survey_responses/read_n_wrangle_data.R"))
+
+bgd_demos <-read_n_wrangle_data(bgd_responses)
+bgd_demos
+
+ind_demos <- read_n_wrangle_data(ind_responses)
+ind_demos
+```
+
+
+
+## Analysis
+
+### BGD
+
+#### Frequency of IP Address 
+Questions:
+
+- How many times 
+- Are the responses different? If so, how are they varying?
+
+Considerations Moving Forward with Surveying:
+
+- Do we want to set a time constraint between allowed survey responses from an individual user? 
+This could allow us the opportunity to create survey periods 
+
+If we were interested in exploring MailChimops product `WhatsAppBusiness`, using the `mailchimp marketing api`, potentially we could set up a workflow to load in contact information, set automated timers to remind subjects to submit an updated survey, track the depth of subject interaction with our message.
+
+```{r}
+# let's filter ip address that have responded more than once
+# 1031 ip addressses appeared more than once
+repeated_ip_addr <- bgd_demos %>%
+  group_by(ip_address) %>%
+  filter(n() > 1)
+
+repeated_ip_addr
+
+# now let's collect the different responses of those ip addresses
+# we expect a many to many relationship between these df 
+# 3957 responses were pulled from the repeating ip addr
+#multiple_responses <- semi_join(bgd_demos, repeated_ip_addr, by = "ip_address") 
+
+multiple_responses <- inner_join(bgd_demos, repeated_ip_addr, by = "ip_address") 
+
+
+# Select columns to pivot (excluding ip_address)
+cols_to_pivot <- setdiff(names(multiple_responses), "ip_address")
+
+# Pivot selected columns into long format
+multiple_responses <- multiple_responses %>%
+  #
+  pivot_longer(cols = all_of(cols_to_pivot), 
+               # store x and y in a new column called variable
+               names_to = c(".value", "variable"), 
+               # use the . in the colname to separate unwanted the characters 
+               names_sep = "\\.") %>% 
+  # remove duplicate entrees that were created using pivot_longer()
+  filter(!grepl("y", variable)) %>% 
+  # remove extra column
+  dplyr::select(-'variable')
+
+multiple_responses
+```
+
+
+#### How did those repeated IP Address responses differ?
+
+
+```{r}
+
+```
+
+#### Sunburt Plot
+
+Broken up by region
+- inside each region: 
+  - what are the gender percentages?:
+    - within those, what are:
+        - age, demo_age:
+               # impact of floods
+              - flood_year, housing_damage, property_loss, contact_authority, flood_close,
+               # socioeconomic factors & resiliency / scarcity 
+              - stay_residence, flood_prepared, housing_safe, enough_eat, move_rural_urban, demo_income, 
+               # sentiments 
+              - climate_problem, trust_government
+              
+For simplicities sake, let's make a series of these:
+
+- Region: Gender: Age
+
+- Region: Gender: Demo_Gender: Age: 
+- Region: Gender: Age: Demo_Age:
+
+- Region: Gender: Demo_Gender: Age: Demo_Age:
+
+
+- Region: Gender: Age: {insert variables, e.g. flood_year}: 
+
+```{r}
+# Group the data by region, gender, and age
+grouped_data <- multi_rep_percs %>%
+  separate(path, into = c("region", "gender", "age"), sep = "-") %>%
+  group_by(region, gender, age) %>%
+  summarise_all(list(mean))
+
+#summary(grouped_data)
+# Create the tree structure
+tree <- d3_nest(grouped_data)
+
+# Create the sunburst plot
+sb <- sund2b(tree, width = "100%")
+
+# Display the plot
+div(
+  style = "display: flex; align-items:center;",
+  sb
+)
+```
+
+
+```{r sunburst_tut}
+library(htmltools)
+library(d3r)
+
+# Group the data by region, gender, and age
+grouped_data <- multi_rep_percs %>%
+  separate(path, into = c("region", "gender", "age"), sep = "-") %>%
+  group_by(region, gender, age) %>%
+  summarise_all(list(mean))
+
+grouped_data
+
+tree <- d3_nest(grouped_data)
+tree
+
+sb3 <- sund2b(tree, width="100%")
+
+div(
+  style="display: flex; align-items:center;",
+  sb3
+)
+```
+
+
+
+```{r personal_demo}
+multi_rep_percs <- multiple_responses %>% 
+  
+  # Treat NA as a separate category
+  mutate(across(where(is.character), ~ifelse(. %in% c(NA, "NA"), "Not Disclosed", .)),
+         across(where(is.numeric), ~ifelse(is.na(.), "Not Disclosed", .))) %>% 
+  
+  # Convert to factor
+ # mutate_at(vars(flood_year, housing_damage, property_loss, contact_authority, flood_close,
+ #                 stay_residence, flood_prepared, housing_safe, enough_eat, move_rural_urban,
+  #                demo_income, climate_problem, trust_government),
+   #         ~factor(., levels = c("Yes", "No", "Not Shared"), exclude = NULL)) %>% 
+  
+    
+  mutate(path = paste(region, gender, demo_gender, sep="-")) %>%
+  
+  group_by(path, age)# %>% 
+
+ # mutate(
+  #  across(
+   #   .cols = all_of(cols_to_calc),
+    #  .fns = list(
+     #   Yes = ~ (sum(. == "Yes" | . == "yes") / n()),
+      #  No = ~ (sum(. == "No" | . == "no") / n()),
+       # `Not Shared` = ~ (sum(. == "Not Shared") / n())
+    #  ),
+    #  .names = "{.col}_{.fn}"
+  #  )
+  #) %>% 
+
+  mutate(
+    age_groups <- 
+    
+    across(
+      .cols = age,
+      .fns = list(
+        Yes = ~ (sum(. == "Yes" | . == "yes") / n()),
+        No = ~ (sum(. == "No" | . == "no") / n()),
+        `Not Shared` = ~ (sum(. == "Not Shared") / n())
+      ),
+      .names = "{.col}_{.fn}"
+    )
+  ) %>% 
+    dplyr::select(path, ends_with("_Yes"), ends_with("_No"), ends_with("_Not Shared"))
+  
+  
+colnames(multi_rep_percs)
+multi_rep_percs
+
+# Plot
+p <- sunburst(multi_rep_percs, legend=FALSE)
+p
+```
+
+
+```{r sunburst_demographics}
+# Columns to calculate percentages for Yes or No responses
+# things commented out are on a scale - will display those using a bar plot
+cols_to_calc <- c("flood_year", "housing_damage", "property_loss", "contact_authority",
+                  "flood_close", "stay_residence", 
+                  #"flood_prepared", "housing_safe",
+                  "enough_eat", "move_rural_urban"#, 
+                  #"demo_income", "climate_problem", 
+                 # "trust_government"
+                 )
+
+
+multi_rep_percs <- multiple_responses %>% 
+  
+  # Treat NA as a separate category
+  mutate(across(where(is.character), ~ifelse(. %in% c(NA, "NA"), "Not Disclosed", .)),
+         across(where(is.numeric), ~ifelse(is.na(.), "Not Disclosed", .))) %>% 
+  
+  # Convert to factor
+  mutate_at(vars(flood_year, housing_damage, property_loss, contact_authority, flood_close,
+                  stay_residence, flood_prepared, housing_safe, enough_eat, move_rural_urban,
+                  demo_income, climate_problem, trust_government),
+            ~factor(., levels = c("Yes", "No", "Not Disclosed"), exclude = NULL)) %>% 
+  
+    
+  mutate(path = paste(region, gender, age, sep="-")) %>%
+  
+  group_by(path) %>% 
+
+  mutate(
+    across(
+      .cols = all_of(cols_to_calc),
+      .fns = list(
+        Yes = ~ (sum(. == "Yes" | . == "yes") / n()),
+        No = ~ (sum(. == "No" | . == "no") / n()),
+        `Not Disclosed` = ~ (sum(. == "Not Disclosed") / n())
+      ),
+      .names = "{.col}_{.fn}"
+    )
+  ) %>% 
+    dplyr::select(path, ends_with("_Yes"), ends_with("_No"), ends_with("_Not Disclosed"))
+  
+  
+colnames(multi_rep_percs)
+multi_rep_percs
+#str(multi_rep_percs)
+
+# Plot
+p <- sunburst(multi_rep_percs, legend=FALSE)
+
+p
+```
+
+```{r}
+# Columns to calculate percentages for Yes or No responses
+# things commented out are on a scale - will display those using a bar plot
+cols_to_calc <- c("flood_year", "housing_damage", "property_loss", "contact_authority",
+                  "flood_close", "stay_residence", 
+                  #"flood_prepared", "housing_safe",
+                  "enough_eat", "move_rural_urban"#, 
+                  #"demo_income", "climate_problem", 
+                 # "trust_government"
+                 )
+
+multi_rep_percs <- multiple_responses %>% 
+  
+  # Treat NA as a separate category
+  mutate(across(where(is.character), ~ifelse(. %in% c(NA, "NA"), "Not Disclosed", .)),
+         across(where(is.numeric), ~ifelse(is.na(.), "Not Disclosed", .))) %>% 
+  
+  # Convert to factor
+  mutate_at(vars(flood_year),
+            ~factor(., levels = c("Yes", "No", "Not Disclosed"), exclude = NULL)) %>% 
+  
+    
+  mutate(path = paste(region, gender, age, sep="-")) %>%
+  
+  group_by(path) %>% 
+
+  mutate(
+    across(
+      .cols = all_of(cols_to_calc),
+      .fns = list(
+        Yes = ~ (sum(. == "Yes" | . == "yes") / n()),
+        No = ~ (sum(. == "No" | . == "no") / n()),
+        `Not Disclosed` = ~ (sum(. == "Not Disclosed") / n())
+      ),
+      .names = "{.col}_{.fn}"
+    )
+  ) %>% 
+    dplyr::select(path, ends_with("_Yes"), ends_with("_No"), ends_with("_Not Disclosed"))
+  
+  
+#colnames(multi_rep_percs)
+#multi_rep_percs
+
+# Plot
+flood_year_burst <- sunburst(multi_rep_percs, legend=FALSE)
+
+flood_year_burst
+
+
+multi_rep_percs <- multiple_responses %>% 
+  
+  # Treat NA as a separate category
+  mutate(across(where(is.character), ~ifelse(. %in% c(NA, "NA"), "Not Disclosed", .)),
+         across(where(is.numeric), ~ifelse(is.na(.), "Not Disclosed", .))) %>% 
+  
+  # Convert to factor
+  mutate_at(vars(flood_year),
+            ~factor(., levels = c("Yes", "No", "Not Disclosed"), exclude = NULL)) %>% 
+  
+    
+  mutate(path = paste(region, gender, demo_gender, age, demo_age, sep="-")) %>%
+  
+  group_by(path) %>% 
+
+  mutate(
+    across(
+      .cols = all_of(cols_to_calc),
+      .fns = list(
+        Yes = ~ (sum(. == "Yes" | . == "yes") / n()),
+        No = ~ (sum(. == "No" | . == "no") / n()),
+        `Not Disclosed` = ~ (sum(. == "Not Disclosed") / n())
+      ),
+      .names = "{.col}_{.fn}"
+    )
+  ) %>% 
+    dplyr::select(path, ends_with("_Yes"), ends_with("_No"), ends_with("_Not Disclosed"))
+  
+  
+#colnames(multi_rep_percs)
+#multi_rep_percs
+
+# Plot
+flood_year_demo_burst <- sunburst(multi_rep_percs, legend=FALSE)
+
+flood_year_demo_burst
+```
+
+
+# This is the most complex version
+The subsections need titles so it's more intuitive 
+
+```{r full_sunburst_wo_hovertag}
+# Columns to calculate percentages for Yes or No responses
+# things commented out are on a scale - will display those using a bar plot
+cols_to_calc <- c("flood_year", "housing_damage", "property_loss", "contact_authority",
+                  "flood_close", "stay_residence", 
+                  #"flood_prepared", "housing_safe",
+                  "enough_eat", "move_rural_urban"#, 
+                  #"demo_income", "climate_problem", 
+                 # "trust_government"
+                 )
+
+
+multi_rep_percs <- multiple_responses %>% 
+  
+  # Treat NA as a separate category
+  mutate(across(where(is.character), ~ifelse(. %in% c(NA, "NA"), "Not Disclosed", .)),
+         across(where(is.numeric), ~ifelse(is.na(.), "Not Disclosed", .))) %>% 
+  
+  # Convert to factor
+  mutate_at(vars(flood_year, housing_damage, property_loss, contact_authority, flood_close,
+                  stay_residence, enough_eat, move_rural_urban),
+            ~factor(., levels = c("Yes", "No", "Not Disclosed"), exclude = NULL)) %>% 
+  
+    
+  mutate(path = paste(region, gender, demo_gender, age, demo_age, sep="-")) %>%
+  
+  group_by(path) %>% 
+
+  mutate(
+    across(
+      .cols = all_of(cols_to_calc),
+      .fns = list(
+        Yes = ~ (sum(. == "Yes" | . == "yes") / n()),
+        No = ~ (sum(. == "No" | . == "no") / n()),
+        `Not Disclosed` = ~ (sum(. == "Not Disclosed") / n())
+      ),
+      .names = "{.col}_{.fn}"
+    )
+  ) %>% 
+    dplyr::select(path, ends_with("_Yes"), ends_with("_No"), ends_with("_Not Disclosed"))
+  
+  
+#colnames(multi_rep_percs)
+#multi_rep_percs
+
+# Plot
+p <- sunburst(multi_rep_percs, legend=FALSE)
+
+p
+
+```
+
+
+#### Bar Plot 
+
+When plotting, add a line of code
+
+if age or gender NA, use data in demo_age or demo_gender instead
+```{r fig.height=12, fig.width=18}
+colors <- c('#fb8500', '#219ebc','#023047')
+# Define the title text with HTML tags
+bar_title <- "Survey Response <span style='color:#fb8500;'>**Female**</span> & <span style='color:#219ebc;'>**Male**</span> Age Demographics"
+
+bar_subtitle <- "The 2035 Initiative Adaptation Observatory: Bangladesh, 2024 April 11"
+
+
+# Plotting
+bgd_demos %>% 
+  ggplot(aes(fill = gender)) +
+  
+  geom_bar(aes(x = age), position = "dodge", width = 1) +
+  
+  geom_text(stat = "count",
+            aes(x = age,
+                y = ..count..,
+                label = ..count..),
+            position = position_dodge(width = 1),
+            vjust = 0.5,
+            hjust = 1.5,
+            size = 8,
+            color = "grey2") +  # Adjust text position and appearance
+  
+  labs(title = bar_title,
+       subtitle = bar_subtitle, 
+       x = "Age",
+       y = "Count") +
+  
+  scale_fill_manual(values = colors) +  # Set custom colors
+  
+  theme_classic() +
+  
+  theme(
+    
+    plot.title = element_markdown(size = 38,
+                                  hjust = 0.5),
+    
+    plot.subtitle = element_markdown(size = 30,
+                                     hjust = 0.5),
+    
+     # Increase facet wrap title size
+    strip.text = element_text(size = 20),
+    
+    axis.title.x = element_text(size = 26,
+                                angle = 0,
+                                vjust = 0.5),
+    
+    axis.title.y = element_text(size = 26,
+                                angle = 0,
+                                vjust = 0.5),
+    
+    axis.text.x = element_text(size = 18),
+    
+    axis.text.y = element_text(size = 18),
+    
+    
+    legend.position = "none",
+   # space on the side of the plot
+    #plot.margin = margin(t = 1, r = 1, b = 1, l = 1, "cm")
+   
+    plot.margin = unit(c(t = 1,
+                         r = 2,
+                         b = 1,
+                         l = 1),
+                       "cm")
+    
+  ) +
+  
+  scale_y_continuous(breaks = seq(0, 3000, by = 50)) +  # Increase y-axis tick marks
+  
+  coord_flip() 
+
+# Plotting
+bgd_demos %>% 
+  ggplot(aes(fill = gender)) +
+  
+  geom_bar(aes(x = age), position = "dodge", width = 1) +
+  
+  geom_text(stat = "count",
+            aes(x = age,
+                y = ..count..,
+                label = ..count..),
+            position = position_dodge(width = 1),
+            vjust = 0.5,
+            hjust = -0.5,
+            size = 8,
+            color = "grey2") +  # Adjust text position and appearance
+  
+  labs(title = bar_title,
+       subtitle = bar_subtitle, 
+       x = "Age",
+       y = "Count") +
+  
+  scale_fill_manual(values = colors) +  # Set custom colors
+  
+  theme_bw() +
+  
+  theme(
+    
+    plot.title = element_markdown(size = 38,
+                                  hjust = 0.5),
+    
+    plot.subtitle = element_markdown(size = 30,
+                                     hjust = 0.5),
+    
+     # Increase facet wrap title size
+    strip.text = element_text(size = 20),
+    
+    axis.title.x = element_text(size = 26,
+                                angle = 0,
+                                vjust = 0.5),
+    
+    axis.title.y = element_text(size = 26,
+                                angle = 0,
+                                vjust = 0.5),
+    
+    axis.text.x = element_text(size = 18),
+    
+    axis.text.y = element_text(size = 18),
+    
+    
+    legend.position = "none",
+   # space on the side of the plot
+    #plot.margin = margin(t = 1, r = 1, b = 1, l = 1, "cm")
+   
+    plot.margin = unit(c(t = 1,
+                         r = 2,
+                         b = 1,
+                         l = 1),
+                       "cm")
+    
+  ) +
+  
+  scale_y_continuous(breaks = seq(0, 300, by = 50)) +  # Increase y-axis tick marks
+  
+  coord_flip() + # Flip coordinates
+  
+  facet_wrap(~region)
+```
+
+
+#### IND
+```{r fig.height=12, fig.width=18}
+#fig.height=20, fig.width=28
+# Define the title text with HTML tags
+bar_title <- "Survey Response <span style='color:#fb8500;'>**Female**</span> & <span style='color:#219ebc;'>**Male**</span> Age Demographics"
+
+bar_subtitle <- "The 2035 Initiative Adaptation Observatory: India, 2024 April 11"
+
+
+# Plotting
+ind_demos %>% 
+  ggplot(aes(fill = gender)) +
+  
+  geom_bar(aes(x = age), position = "dodge", width = 1) +
+  
+  geom_text(stat = "count",
+            aes(x = age,
+                y = ..count..,
+                label = ..count..),
+            position = position_dodge(width = 1),
+            vjust = 0.5,
+            hjust = 2.5,
+            size = 8,
+            color = "grey2") +  # Adjust text position and appearance
+  
+  labs(title = bar_title,
+       subtitle = bar_subtitle, 
+       x = "Age",
+       y = "Count") +
+  
+  scale_fill_manual(values = colors) +  # Set custom colors
+  
+  theme_classic() +
+  
+  theme(
+    
+    plot.title = element_markdown(size = 38,
+                                  hjust = 0.5),
+    
+    plot.subtitle = element_markdown(size = 30,
+                                     hjust = 0.5),
+    
+     # Increase facet wrap title size
+    strip.text = element_text(size = 20),
+    
+    axis.title.x = element_text(size = 26,
+                                angle = 0,
+                                vjust = 0.5),
+    
+    axis.title.y = element_text(size = 26,
+                                angle = 0,
+                                vjust = 0.5),
+    
+    axis.text.x = element_text(size = 18),
+    
+    axis.text.y = element_text(size = 18),
+    
+    
+    legend.position = "none",
+   # space on the side of the plot
+    #plot.margin = margin(t = 1, r = 1, b = 1, l = 1, "cm")
+   
+    plot.margin = unit(c(t = 1,
+                         r = 2,
+                         b = 1,
+                         l = 1),
+                       "cm")
+    
+  ) +
+  
+  scale_y_continuous(breaks = seq(0, 3000, by = 50)) +  # Increase y-axis tick marks
+  
+  coord_flip() 
+
+# Plotting
+ind_demos %>% 
+  ggplot(aes(fill = gender)) +
+  
+  geom_bar(aes(x = age), position = "dodge", width = 1) +
+  
+  geom_text(stat = "count",
+            aes(x = age,
+                y = ..count..,
+                label = ..count..),
+            position = position_dodge(width = 1),
+            vjust = 0.5,
+            hjust = -0.5,
+            size = 8,
+            color = "grey2") +  # Adjust text position and appearance
+  
+  labs(title = bar_title,
+       subtitle = bar_subtitle, 
+       x = "Age",
+       y = "Count") +
+  
+  scale_fill_manual(values = colors) +  # Set custom colors
+  
+  theme_bw() +
+  
+  theme(
+    
+    plot.title = element_markdown(size = 38,
+                                  hjust = 0.5),
+    
+    plot.subtitle = element_markdown(size = 30,
+                                     hjust = 0.5),
+    
+     # Increase facet wrap title size
+    strip.text = element_text(size = 20),
+    
+    axis.title.x = element_text(size = 26,
+                                angle = 0,
+                                vjust = 0.5),
+    
+    axis.title.y = element_text(size = 26,
+                                angle = 0,
+                                vjust = 0.5),
+    
+    axis.text.x = element_text(size = 18),
+    
+    axis.text.y = element_text(size = 18),
+    
+    
+    legend.position = "none",
+   # space on the side of the plot
+    #plot.margin = margin(t = 1, r = 1, b = 1, l = 1, "cm")
+   
+    plot.margin = unit(c(t = 1,
+                         r = 2,
+                         b = 1,
+                         l = 1),
+                       "cm")
+    
+  ) +
+  
+  scale_y_continuous(breaks = seq(0, 300, by = 50)) +  # Increase y-axis tick marks
+  
+  coord_flip() + # Flip coordinates
+  
+  facet_wrap(~region)
+```
+
+### Density Distribution of Gender based on Age & Colored by Region (facet wrap by Gender)
+
+also Age vs Demo_Age colored by gender
+
+Werk in progress
+
+## Geospatial Analysis
+For anoynmity purposes, it's best these plots don't render with the IP Addresses
+```{r}
+ind_demo_sf <- ind_demos %>% 
+  
+  st_as_sf(coords = c("location_longitude", "location_latitude"), crs = 4326)
+  
+  
+tmap_mode('view')
+
+ind_response_map <- tm_shape(ind_demo_sf) +
+  tm_basemap(leaflet::providers$Esri.WorldImagery) +
+  tm_bubbles(alpha = 0.2,
+             fill = 'ip_address',
+             col = 'skyblue',) +
+  tm_scalebar(position = c('left', 'bottom')) +
+  tm_title("Adaptation Observatory Responses, Bangladesh (2024-4-11)")
+
+ind_response_map
+```
+
+
+```{r}
+bgd_demo_sf <- bgd_demos %>% 
+  
+  st_as_sf(coords = c("location_longitude", "location_latitude"), crs = 4326)
+  
+  
+tmap_mode('view')
+
+bgd_response_map <- tm_shape(bgd_demo_sf) +
+  tm_basemap(leaflet::providers$Esri.WorldImagery) +
+  tm_bubbles(alpha = 0.2,
+             fill = 'ip_address',
+             col = 'skyblue',) +
+  tm_scalebar(position = c('left', 'bottom')) +
+  tm_title("Adaptation Observatory Responses, Bangladesh (2024-4-11)")
+
+
+bgd_response_map
+```
+
