@@ -5,10 +5,20 @@
 library(tidyverse)        # load the tidyverse package to assist with data wrangling & cleaning 
 library(treemap)
 library(patchwork)        # load the patchwork package to assist in plot composition (displaying multiple data visualizations) 
-
 library(showtext)         # load the showtext to more easily use fonts
 library(here)
 library(purrr)
+library(RColorBrewer)
+library(showtext)
+
+#..........................import fonts..........................
+# `name` is the name of the font as it appears in Google Fonts
+# `family` is the user-specified id that you'll use to apply a font in your ggpplot
+font_add_google(name = "Josefin Sans", family = "josefin")
+font_add_google(name = "Sen", family = "sen")
+
+#................enable {showtext} for rendering.................
+showtext_auto()
 
 bgd_file <- file.path(here("..","data","adapt_observ_survey_responses", "Observatory_Bangladesh_2024_04_15.csv"))
   
@@ -83,6 +93,9 @@ bgd_demos
 ind_demos
 ```
 ```{r grouped_data, fig.height=10, fig.width=22}
+cols_to_calc <- c('flood_year', 'housing_damage', 'property_loss', 'contact_authority', 'flood_close', 'flood_prepared',
+           'stay_residence', 'enough_eat', 'move_rural_urban', 'demo_income')
+
 # Grouping the data by region
 grouped_data <- ind_demos %>%
   group_by(region) %>%
@@ -135,8 +148,10 @@ generate_treemap_plots <- function(data, parameter) {
                     # Set text color to white for all levels
                     fontcolor.labels = c("black", "grey20", "white"), 
                     
+                    fontfamily.labels = c("josefin","sen","sen","sen"),  # Font family for labels
+        
                     # Bold the parameter label
-                    fontface.labels = c("bold", "plain", "plain", "bold"),  
+                    fontface.labels = c("bold", "plain", "bold", "bold"),  
                     
                     # Set border color to white for better visibility
                     border.col = "white", 
@@ -191,7 +206,7 @@ plots_collection <- generate_treemap_plots(grouped_data, parameters)
 
 ```{r region_gender_age, fig.height=11, fig.width=22}
 # Define a color palette
-library(RColorBrewer)
+
 colors <- rev(brewer.pal(11, 'Set3')) # You can choose any color palette from RColorBrewer 
 brewer.pal.info
 
