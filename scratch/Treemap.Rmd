@@ -92,12 +92,106 @@ bgd_demos
 #ind_demos <- read_n_wrangle_data(ind_responses)
 ind_demos
 ```
-```{r grouped_data, fig.height=10, fig.width=22}
+# function
+```{r fig.height=11, fig.width=22}
+generate_treemap_plots <- function(data, country, parameter) {
+  # Create the output folder based on the country name
+ # output_folder <- paste0("plots_", gsub(" ", "_", tolower(country)))
+  #if (!dir.exists(output_folder)) {
+   # dir.create(output_folder)
+  #}
+  
+  
+  # Define a color palette
+  #colors <-   colorRampPalette(rev(brewer.pal(11, "Set3")))(50)
+  colors <- rev(brewer.pal(11, 'Set3'))
+
+  
+  # Create a list to store the plots
+  plots <- list()
+  
+  # Iterate through the parameters
+  for (param in parameter) {
+    # Create the treemap
+    plot <- treemap(data,
+                    index = c("region", "gender", "age", param),
+                    vSize = "number_of_surveys_submitted",
+                    algorithm = "squarified",
+                    title = paste(str_to_title(country), "Survey Response:", str_to_title(gsub("_", " ", param)), "by Region, Gender, and Age"),
+                    palette = colors,
+                    
+                    # Increase the font size of the title
+                    fontsize.title = 50,   
+                    
+                    # Set title typeface
+                    fontfamily.title = "josefin",
+                    
+                    # Font size for labels
+                    fontsize.labels = c(40, 25, 20, 18),  
+                    
+                    # Set text color to white for all levels
+                    fontcolor.labels = c("black", "grey20", "white"), 
+                    
+                    fontfamily.labels = c("josefin","sen","sen","sen"),  # Font family for labels
+        
+                    # Bold the parameter label
+                    fontface.labels = c("bold", "plain", "bold", "bold"),  
+                    
+                    # Set border color to white for better visibility
+                    border.col = "white", 
+                   
+                    # Adjust line size (border width) as needed 
+                    border.lw = 2,  
+                    
+                    # Align labels to center
+                    align.labels = list(c("center", "center", "center", "center")), 
+                    
+                    # Adjust overlap for better readability
+                    overlap.labels = 0,  
+                    
+                    # Set background color of labels to transparent
+                    #bg.labels = "transparent", 
+                    
+                    # Add a margin (top, right, bottom, left)
+                    margin = c(20, 20, 20, 20), 
+                    
+                    # Font size for background labels
+                    fontsize.labels.bg = c(16, 14),
+                    
+                    # Specify the width of the plot
+                    width = 1920,  
+                    
+                    # Specify the height of the plot
+                    # Adjust the height proportionally (e.g., 75% of the width)
+                    height = 1920 * 0.75  
+                  
+    ) 
+    
+    # Save the plot as a PNG file in the output folder
+  #  filename <- file.path(output_folder, paste0(param, ".png"))
+   # ggsave(filename, plot, width = 12, height = 8)  # Adjust width and height as needed
+    
+    # Append the plot to the list
+    plots[[param]] <- plot
+  }
+  
+  return(plots)
+}
+
+# Define the parameters to iterate through
+parameters <- c("flood_year", "housing_damage", "property_loss", "contact_authority", "flood_close", 
+                "flood_prepared", "stay_residence", "enough_eat", "move_rural_urban", "demo_income",
+                'demo_gender',"demo_age")
+```
+
+
+# Bangladesh
+```{r}
 cols_to_calc <- c('flood_year', 'housing_damage', 'property_loss', 'contact_authority', 'flood_close', 'flood_prepared',
            'stay_residence', 'enough_eat', 'move_rural_urban', 'demo_income')
 
 # Grouping the data by region
-grouped_data <- ind_demos %>%
+grouped_data <- bgd_demos %>%
   group_by(region) %>%
   mutate(across(
     .cols = all_of(cols_to_calc),
@@ -117,30 +211,65 @@ grouped_data <- grouped_data %>%
   summarise(number_of_surveys_submitted = n()) %>%
   ungroup()
 ```
- 
-# function
-```{r fig.height=11, fig.width=22}
-generate_treemap_plots <- function(data, parameter) {
-  # Define a color palette
-  #colors <-   colorRampPalette(rev(brewer.pal(11, "Set3")))(50)
-  colors <- rev(brewer.pal(11, 'Set3'))
 
-  
-  # Create a list to store the plots
-  plots <- list()
-  
-  # Iterate through the parameters
-  for (param in parameter) {
-    # Create the treemap
-    plot <- treemap(data,
-                    index = c("region", "gender", "age", param),
+```{r India_demo_trees, fig.height=11, fig.width=22}
+# Generate treemap plots for each parameter
+plots_collection <- generate_treemap_plots(data = grouped_data,
+                                           country = "Bangladesh", 
+                                           parameter = parameters)
+```
+# India
+```{r grouped_data, fig.height=10, fig.width=22}
+# Grouping the data by region
+grouped_data <- ind_demos %>%
+  group_by(region) %>%
+  mutate(across(
+    .cols = all_of(cols_to_calc),
+    .fns = list(
+      Yes = ~ mean(. %in% c("Yes", "yes")),
+      No = ~ mean(. %in% c("No", "no")),
+      `Not Disclosed` = ~ mean(is.na(.) | . == "Not Disclosed")
+      ),
+    .names = "{.col}_{.fn}"
+  )) %>%
+  ungroup()
+
+# Now, group by all variables including region
+grouped_data <- grouped_data %>%
+  group_by(region, gender, demo_gender, age, demo_age, flood_year, housing_damage, property_loss, contact_authority, flood_close, flood_prepared,
+           stay_residence, enough_eat, move_rural_urban, demo_income) %>%
+  summarise(number_of_surveys_submitted = n()) %>%
+  ungroup()
+```
+ 
+
+```{r India_demo_trees, fig.height=11, fig.width=22}
+# Generate treemap plots for each parameter
+plots_collection <- generate_treemap_plots(data = grouped_data,
+                                           country = "India", 
+                                           parameter = parameters)
+```
+
+
+```{r region_gender_age, fig.height=11, fig.width=22}
+# Define a color palette
+
+colors <- rev(brewer.pal(11, 'Set3')) # You can choose any color palette from RColorBrewer 
+brewer.pal.info
+
+# Create the treemap with the specified color palette
+treemap(data,
+                    index = c("region", "gender", "age"),
                     vSize = "number_of_surveys_submitted",
                     algorithm = "squarified",
-                    title = paste("India Survey Response:", param, "by Region, Gender, and Age"),
+                    title = paste("India Survey Response: by Region, Gender, and Age"),
                     palette = colors,
                     
                     # Increase the font size of the title
                     fontsize.title = 45,   
+                    
+                    # Set title typeface
+                    fontfamily.title = "josefin",
                     
                     # Font size for labels
                     fontsize.labels = c(35, 20, 18, 15),  
@@ -174,70 +303,15 @@ generate_treemap_plots <- function(data, parameter) {
                     # Font size for background labels
                     fontsize.labels.bg = c(16, 14),
                    
-                    width = 800,  # Specify the width of the plot
+                    #width = 800,  # Specify the width of the plot
         
-                    height = 600  # Specify the height of the plot
+                   # height = 600  # Specify the height of the plot
+                    
+                    width = 1920,  # Specify the width of the plot
+                    height = 1920 * 0.75  # Adjust the height proportionally (e.g., 75% of the width)
 
                   
-    )
-    
-    # Append the plot to the list
-    plots[[param]] <- plot
-  }
-  
-  return(plots)
-}
-
-# Define the parameters to iterate through
-parameters <- c("flood_year", "housing_damage", "property_loss", "contact_authority", "flood_close", 
-                "flood_prepared", "stay_residence", "enough_eat", "move_rural_urban", "demo_income")
-
-# Generate treemap plots for each parameter
-plots_collection <- generate_treemap_plots(grouped_data, parameters)
-```
-
-
-
-
-
-
-
-
-
-```{r region_gender_age, fig.height=11, fig.width=22}
-# Define a color palette
-
-colors <- rev(brewer.pal(11, 'Set3')) # You can choose any color palette from RColorBrewer 
-brewer.pal.info
-
-# Create the treemap with the specified color palette
-treemap(grouped_data,
-        index=c("region", "gender", "age"#, "flood_year"#, "property_loss", "contact_authority", 
-               # "flood_close", "stay_residence", "enough_eat", "move_rural_urban", "demo_income
-               ),
-        vSize="number_of_surveys_submitted",
-        algorithm="squarified",
-        title="India Survey Response Categories: Region, Gender, and Age",
-        palette=colors,
-        # Increase the font size of the title
-        fontsize.title = 20,   
-         # Font size for region titles and other labels
-        fontsize.labels = c(16, 12), 
-        # Set border color to white for better visibility
-        border.col = "white",  
-        # Align labels to center
-        align.labels = list(c("center", "center")),  
-        # Adjust overlap for better readability
-        overlap.labels = 0,
-        # Add a margin (top, right, bottom, left)
-        margin = c(20, 20, 20, 20),
-        
-        fontsize.labels.bg = c(20, 20),  # Font size for background labels
-        
-         # Set background color of labels to transparent
-        fontsize.labels.bg = c(14, 12)  # Font size for background labels
-        
-        )
+    ) 
 ```
 
 
@@ -263,7 +337,6 @@ treemap(grouped_data,
         fontsize.labels.bg = c(16, 14),  # Font size for background labels
         border.lwds = 1.5
         )
-
 ```
 
 
