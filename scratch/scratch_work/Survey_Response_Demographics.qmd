@@ -1,0 +1,270 @@
+---
+author: "Sofia Ingersoll"
+title: "Adaptation Observatory: Survey Response Demographics (Bangladesh & India)"
+date: 2024-4-14
+format:
+  html:
+    code-fold: true
+    code-summary: "Show the code"
+#embed-resources: true
+---
+
+## Set Up
+
+```{r message = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+
+#..........................load packages.........................
+library(tidyverse)        # load the tidyverse package to assist with data wrangling & cleaning 
+
+library(patchwork)        # load the patchwork package to assist in plot composition (displaying multiple data visualizations) 
+
+library(showtext)         # load the showtext to more easily use fonts
+library(here)
+
+library(leaflet)
+library(osmextract) 
+library(units)
+library(sf)
+library(sfheaders)
+library(sp)
+library(raster)
+library(tmap)
+library(terra)
+library(stars)
+library(ggtext)
+library(units)
+
+library(tidyverse)
+library(treemap)
+library(sunburstR)
+library(purrr)
+```
+
+## Load & Wrangle Survey Demographic Data
+```{r warning = FALSE}
+bgd_file <- file.path(here("..","data","adapt_observ_survey_responses", "Observatory_Bangladesh_2024_04_15.csv"))
+  
+ind_file <- file.path(here("..","data","adapt_observ_survey_responses", "Observatory_India_2024_04_15.csv"))
+
+bgd_responses <- read_csv(bgd_file, show_col_types = FALSE)
+  
+ind_responses <-read_csv(ind_file, show_col_types = FALSE)
+
+
+bgd_demos <- bgd_responses %>%
+  dplyr::select(IPAddress, age, gender, region, LocationLatitude, LocationLongitude, demo_age, demo_gender,
+                 # impact of floods
+                flood_year, housing_damage, property_loss, contact_authority, flood_close,
+                 # socioeconomic factors & resiliency / scarcity 
+                stay_residence, flood_prepared, housing_safe, enough_eat, move_rural_urban, demo_income, 
+                # sentiments 
+                climate_problem, trust_government) %>%
+  
+  janitor::clean_names() %>%
+  
+  # Treat NA as a separate category
+  mutate(across(where(is.character), ~ifelse(. %in% c(NA, "NA"), "Not Disclosed", .)),
+         across(where(is.numeric), ~ifelse(is.na(.), "Not Disclosed", .))) %>% 
+  
+  mutate(location_longitude = as.numeric(location_longitude),
+         location_latitude = as.numeric(location_latitude)) %>%
+  # remove incomplete geolocations
+  filter(complete.cases(location_latitude, location_longitude)) %>% 
+  # Count the occurrences of each IPAddress
+  group_by(ip_address) %>%
+  mutate(number_of_surverys_submitted = n()) %>%
+  ungroup() %>%
+  # remove first two rows
+  slice(-c(1, 2))
+ 
+
+ind_demos <- ind_responses %>%
+  dplyr::select(IPAddress, age, gender, region, LocationLatitude, LocationLongitude, demo_age, demo_gender,
+                 # impact of floods
+                flood_year, housing_damage, property_loss, contact_authority, flood_close,
+                 # socioeconomic factors & resiliency / scarcity 
+                stay_residence, flood_prepared, housing_safe, enough_eat, move_rural_urban, demo_income, 
+                # sentiments 
+                climate_problem, trust_government) %>%
+  
+  janitor::clean_names() %>%
+  
+  # Treat NA as a separate category
+  mutate(across(where(is.character), ~ifelse(. %in% c(NA, "NA"), "Not Disclosed", .)),
+         across(where(is.numeric), ~ifelse(is.na(.), "Not Disclosed", .))) %>% 
+  
+  mutate(location_longitude = as.numeric(location_longitude),
+         location_latitude = as.numeric(location_latitude)) %>%
+  # remove incomplete geolocations
+  filter(complete.cases(location_latitude, location_longitude)) %>% 
+  # Count the occurrences of each IPAddress
+  group_by(ip_address) %>%
+  mutate(number_of_surverys_submitted = n()) %>%
+  ungroup() %>%
+  # remove first two rows
+  slice(-c(1, 2))
+
+
+#bgd_responses <- file.path(here("..","data","adapt_observ_survey_responses", "Observatory_Bangladesh_2024_04_15.csv"))
+  
+#ind_responses <- file.path(here("..","data","adapt_observ_survey_responses", "Observatory_India_2024_04_15.csv"))
+
+# load function
+# Source the .R file containing the function
+#source(here("survey_responses/read_n_wrangle_data.R"))
+
+#bgd_demos <-read_n_wrangle_data(bgd_responses)
+bgd_demos
+
+#ind_demos <- read_n_wrangle_data(ind_responses)
+ind_demos
+```
+
+
+
+## Analysis
+
+### BGD
+
+**1031 Duplicate IP Addresses**
+**3957 Responses from the duplicate ip addresses**
+
+#### Frequency of IP Address 
+Questions:
+
+- How many times 
+- Are the responses different? If so, how are they varying?
+
+Considerations Moving Forward with Surveying:
+
+- Do we want to set a time constraint between allowed survey responses from an individual user? 
+This could allow us the opportunity to create survey periods 
+
+If we were interested in exploring MailChimops product `WhatsAppBusiness`, using the `mailchimp marketing api`, potentially we could set up a workflow to load in contact information, set automated timers to remind subjects to submit an updated survey, track the depth of subject interaction with our message.
+
+Spoke to mailchimp rep & they're sending me the developers website. I see they have integrations with Facebook ads and LinkedIn
+
+Currently, there is not a WhatsAppBusiness integration atm, but hopefully in the future. Marketing api is OPEN! So we'll have access with the Essential package Christin talked about.
+
+What plan do we need to access both with the marketing API? 
+
+- Whatsapp: can we automate when to send a new message out to our contacts based on their last interaction / submission
+- Whatsapp: can we send out batch messages usingmarketing api / code
+- EMAIL: can we set up an automation system to rotate batches of contacts as we update our contact list? so filter out those that have beem 
+
+```{r}
+# let's filter ip address that have responded more than once
+# 1031 ip addressses appeared more than once
+repeated_ip_addr <- bgd_demos %>%
+  group_by(ip_address) %>%
+  filter(n() > 1)
+
+repeated_ip_addr
+
+# now let's collect the different responses of those ip addresses
+# we expect a many to many relationship between these df 
+# 3957 responses were pulled from the repeating ip addr
+#multiple_responses <- semi_join(bgd_demos, repeated_ip_addr, by = "ip_address") 
+
+multiple_responses <- inner_join(bgd_demos, repeated_ip_addr, by = "ip_address") 
+
+
+# Select columns to pivot (excluding ip_address)
+cols_to_pivot <- setdiff(names(multiple_responses), "ip_address")
+
+# Pivot selected columns into long format
+multiple_responses <- multiple_responses %>%
+  #
+  pivot_longer(cols = all_of(cols_to_pivot), 
+               # store x and y in a new column called variable
+               names_to = c(".value", "variable"), 
+               # use the . in the colname to separate unwanted the characters 
+               names_sep = "\\.") %>% 
+  # remove duplicate entrees that were created using pivot_longer()
+  filter(!grepl("y", variable)) %>% 
+  # remove extra column
+  dplyr::select(-'variable')
+
+multiple_responses
+```
+
+# India
+```{r}
+# let's filter ip address that have responded more than once
+# 1031 ip addressses appeared more than once
+repeated_ip_addr <- ind_demos %>%
+  group_by(ip_address) %>%
+  filter(n() > 1)
+
+repeated_ip_addr
+
+# now let's collect the different responses of those ip addresses
+# we expect a many to many relationship between these df 
+# 3957 responses were pulled from the repeating ip addr
+#multiple_responses <- semi_join(bgd_demos, repeated_ip_addr, by = "ip_address") 
+
+multiple_responses <- inner_join(bgd_demos, repeated_ip_addr, by = "ip_address") 
+
+
+# Select columns to pivot (excluding ip_address)
+cols_to_pivot <- setdiff(names(multiple_responses), "ip_address")
+
+# Pivot selected columns into long format
+multiple_responses <- multiple_responses %>%
+  #
+  pivot_longer(cols = all_of(cols_to_pivot), 
+               # store x and y in a new column called variable
+               names_to = c(".value", "variable"), 
+               # use the . in the colname to separate unwanted the characters 
+               names_sep = "\\.") %>% 
+  # remove duplicate entrees that were created using pivot_longer()
+  filter(!grepl("y", variable)) %>% 
+  # remove extra column
+  dplyr::select(-'variable')
+
+multiple_responses
+```
+
+
+
+
+
+
+
+
+---- Future Work || In Progress via `sunburst.Rmd`
+
+#### How did those repeated IP Address responses differ?
+
+
+```{r}
+
+```
+
+#### Sunburt Plot
+
+Broken up by region
+- inside each region: 
+  - what are the gender percentages?:
+    - within those, what are:
+        - age, demo_age:
+               # impact of floods
+              - flood_year, housing_damage, property_loss, contact_authority, flood_close,
+               # socioeconomic factors & resiliency / scarcity 
+              - stay_residence, flood_prepared, housing_safe, enough_eat, move_rural_urban, demo_income, 
+               # sentiments 
+              - climate_problem, trust_government
+              
+For simplicities sake, let's make a series of these:
+
+- Region: Gender: Age
+
+- Region: Gender: Demo_Gender: Age: 
+- Region: Gender: Age: Demo_Age:
+
+- Region: Gender: Demo_Gender: Age: Demo_Age:
+
+
+- Region: Gender: Age: {insert variables, e.g. flood_year}: 
+

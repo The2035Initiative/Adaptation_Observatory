@@ -1,0 +1,305 @@
+#### Bar Plot 
+
+## Load & Wrangle Survey Demographic Data
+```{r warning = FALSE}
+bgd_responses <- file.path(here("..","data","adapt_observ_survey_responses", "Observatory_Bangladesh_2024_04_15.csv"))
+  
+ind_responses <- file.path(here("..","data","adapt_observ_survey_responses", "Observatory_India_2024_04_15.csv"))
+
+# load function
+# Source the .R file containing the function
+source(here("survey_responses/read_n_wrangle_data.R"))
+
+bgd_demos <-read_n_wrangle_data(bgd_responses)
+bgd_demos
+
+ind_demos <- read_n_wrangle_data(ind_responses)
+ind_demos
+```
+
+When plotting, add a line of code
+
+if age or gender NA, use data in demo_age or demo_gender instead
+```{r fig.height=12, fig.width=18}
+colors <- c('#fb8500', '#219ebc','#023047')
+# Define the title text with HTML tags
+bar_title <- "Survey Response <span style='color:#fb8500;'>**Female**</span> & <span style='color:#219ebc;'>**Male**</span> Age Demographics"
+
+bar_subtitle <- "The 2035 Initiative Adaptation Observatory: Bangladesh, 2024 April 11"
+
+
+# Plotting
+bgd_demos %>% 
+  ggplot(aes(fill = gender)) +
+  
+  geom_bar(aes(x = age), position = "dodge", width = 1) +
+  
+  geom_text(stat = "count",
+            aes(x = age,
+                y = ..count..,
+                label = ..count..),
+            position = position_dodge(width = 1),
+            vjust = 0.5,
+            hjust = 1.5,
+            size = 8,
+            color = "grey2") +  # Adjust text position and appearance
+  
+  labs(title = bar_title,
+       subtitle = bar_subtitle, 
+       x = "Age",
+       y = "Count") +
+  
+  scale_fill_manual(values = colors) +  # Set custom colors
+  
+  theme_classic() +
+  
+  theme(
+    
+    plot.title = element_markdown(size = 38,
+                                  hjust = 0.5),
+    
+    plot.subtitle = element_markdown(size = 30,
+                                     hjust = 0.5),
+    
+     # Increase facet wrap title size
+    strip.text = element_text(size = 20),
+    
+    axis.title.x = element_text(size = 26,
+                                angle = 0,
+                                vjust = 0.5),
+    
+    axis.title.y = element_text(size = 26,
+                                angle = 0,
+                                vjust = 0.5),
+    
+    axis.text.x = element_text(size = 18),
+    
+    axis.text.y = element_text(size = 18),
+    
+    
+    legend.position = "none",
+   # space on the side of the plot
+    #plot.margin = margin(t = 1, r = 1, b = 1, l = 1, "cm")
+   
+    plot.margin = unit(c(t = 1,
+                         r = 2,
+                         b = 1,
+                         l = 1),
+                       "cm")
+    
+  ) +
+  
+  scale_y_continuous(breaks = seq(0, 3000, by = 50)) +  # Increase y-axis tick marks
+  
+  coord_flip() 
+
+# Plotting
+bgd_demos %>% 
+  ggplot(aes(fill = gender)) +
+  
+  geom_bar(aes(x = age), position = "dodge", width = 1) +
+  
+  geom_text(stat = "count",
+            aes(x = age,
+                y = ..count..,
+                label = ..count..),
+            position = position_dodge(width = 1),
+            vjust = 0.5,
+            hjust = -0.5,
+            size = 8,
+            color = "grey2") +  # Adjust text position and appearance
+  
+  labs(title = bar_title,
+       subtitle = bar_subtitle, 
+       x = "Age",
+       y = "Count") +
+  
+  scale_fill_manual(values = colors) +  # Set custom colors
+  
+  theme_bw() +
+  
+  theme(
+    
+    plot.title = element_markdown(size = 38,
+                                  hjust = 0.5),
+    
+    plot.subtitle = element_markdown(size = 30,
+                                     hjust = 0.5),
+    
+     # Increase facet wrap title size
+    strip.text = element_text(size = 20),
+    
+    axis.title.x = element_text(size = 26,
+                                angle = 0,
+                                vjust = 0.5),
+    
+    axis.title.y = element_text(size = 26,
+                                angle = 0,
+                                vjust = 0.5),
+    
+    axis.text.x = element_text(size = 18),
+    
+    axis.text.y = element_text(size = 18),
+    
+    
+    legend.position = "none",
+   # space on the side of the plot
+    #plot.margin = margin(t = 1, r = 1, b = 1, l = 1, "cm")
+   
+    plot.margin = unit(c(t = 1,
+                         r = 2,
+                         b = 1,
+                         l = 1),
+                       "cm")
+    
+  ) +
+  
+  scale_y_continuous(breaks = seq(0, 300, by = 50)) +  # Increase y-axis tick marks
+  
+  coord_flip() + # Flip coordinates
+  
+  facet_wrap(~region)
+```
+
+
+#### IND
+```{r fig.height=12, fig.width=18}
+#fig.height=20, fig.width=28
+# Define the title text with HTML tags
+bar_title <- "Survey Response <span style='color:#fb8500;'>**Female**</span> & <span style='color:#219ebc;'>**Male**</span> Age Demographics"
+
+bar_subtitle <- "The 2035 Initiative Adaptation Observatory: India, 2024 April 11"
+
+
+# Plotting
+ind_demos %>% 
+  ggplot(aes(fill = gender)) +
+  
+  geom_bar(aes(x = age), position = "dodge", width = 1) +
+  
+  geom_text(stat = "count",
+            aes(x = age,
+                y = ..count..,
+                label = ..count..),
+            position = position_dodge(width = 1),
+            vjust = 0.5,
+            hjust = 2.5,
+            size = 8,
+            color = "grey2") +  # Adjust text position and appearance
+  
+  labs(title = bar_title,
+       subtitle = bar_subtitle, 
+       x = "Age",
+       y = "Count") +
+  
+  scale_fill_manual(values = colors) +  # Set custom colors
+  
+  theme_classic() +
+  
+  theme(
+    
+    plot.title = element_markdown(size = 38,
+                                  hjust = 0.5),
+    
+    plot.subtitle = element_markdown(size = 30,
+                                     hjust = 0.5),
+    
+     # Increase facet wrap title size
+    strip.text = element_text(size = 20),
+    
+    axis.title.x = element_text(size = 26,
+                                angle = 0,
+                                vjust = 0.5),
+    
+    axis.title.y = element_text(size = 26,
+                                angle = 0,
+                                vjust = 0.5),
+    
+    axis.text.x = element_text(size = 18),
+    
+    axis.text.y = element_text(size = 18),
+    
+    
+    legend.position = "none",
+   # space on the side of the plot
+    #plot.margin = margin(t = 1, r = 1, b = 1, l = 1, "cm")
+   
+    plot.margin = unit(c(t = 1,
+                         r = 2,
+                         b = 1,
+                         l = 1),
+                       "cm")
+    
+  ) +
+  
+  scale_y_continuous(breaks = seq(0, 3000, by = 50)) +  # Increase y-axis tick marks
+  
+  coord_flip() 
+
+# Plotting
+ind_demos %>% 
+  ggplot(aes(fill = gender)) +
+  
+  geom_bar(aes(x = age), position = "dodge", width = 1) +
+  
+  geom_text(stat = "count",
+            aes(x = age,
+                y = ..count..,
+                label = ..count..),
+            position = position_dodge(width = 1),
+            vjust = 0.5,
+            hjust = -0.5,
+            size = 8,
+            color = "grey2") +  # Adjust text position and appearance
+  
+  labs(title = bar_title,
+       subtitle = bar_subtitle, 
+       x = "Age",
+       y = "Count") +
+  
+  scale_fill_manual(values = colors) +  # Set custom colors
+  
+  theme_bw() +
+  
+  theme(
+    
+    plot.title = element_markdown(size = 38,
+                                  hjust = 0.5),
+    
+    plot.subtitle = element_markdown(size = 30,
+                                     hjust = 0.5),
+    
+     # Increase facet wrap title size
+    strip.text = element_text(size = 20),
+    
+    axis.title.x = element_text(size = 26,
+                                angle = 0,
+                                vjust = 0.5),
+    
+    axis.title.y = element_text(size = 26,
+                                angle = 0,
+                                vjust = 0.5),
+    
+    axis.text.x = element_text(size = 18),
+    
+    axis.text.y = element_text(size = 18),
+    
+    
+    legend.position = "none",
+   # space on the side of the plot
+    #plot.margin = margin(t = 1, r = 1, b = 1, l = 1, "cm")
+   
+    plot.margin = unit(c(t = 1,
+                         r = 2,
+                         b = 1,
+                         l = 1),
+                       "cm")
+    
+  ) +
+  
+  scale_y_continuous(breaks = seq(0, 300, by = 50)) +  # Increase y-axis tick marks
+  
+  coord_flip() + # Flip coordinates
+  
+  facet_wrap(~region)
+```
