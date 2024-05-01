@@ -100,8 +100,22 @@ bgd_data
 length(unique(bgd_data$response_id))
 
 # let's further investigate the variance in responses
-dup_ip_bgd <- bgd %>% 
-  filter(no_surverys_submitted > 1)
+dup_ip_bgd <- bgd_data %>% 
+  filter(no_surverys_submitted > 1) %>% 
+  mutate(income_brackets = case_when(
+    demo_income <= 300000 ~ "0% Tax Rate (Up to BDT 300,000)",
+    demo_income > 300000 & demo_income <= 400000 ~ "5% Tax Rate (BDT 300,001 - 400,000)",
+    demo_income > 400000 & demo_income <= 700000 ~ "10% Tax Rate (BDT 400,001 - 700,000)",
+    demo_income > 700000 & demo_income <= 1100000 ~ "15% Tax Rate (BDT 700,001 - 1,100,000)",
+    demo_income > 1100000 & demo_income <= 1600000 ~ "20% Tax Rate (BDT 1,100,001 - 1,600,000)",
+    demo_income > 1600000 ~ "25% Tax Rate (Above BDT 1,600,000)") 
+    )
+
+
+length(unique(dup_ip_bgd$comp_phone1_try1))
+
+
+write.csv(dup_ip_bgd, file = "../clean_data/adaptation_observatory_bgd_cleaned_duplicate_survey_questions_R1.csv")
 ```
 
 ####  Make a csv of all the responser ids
@@ -132,6 +146,10 @@ bgd_data <- bgd_data %>%
     demo_income > 1100000 & demo_income <= 1600000 ~ "20% Tax Rate (BDT 1,100,001 - 1,600,000)",
     demo_income > 1600000 ~ "25% Tax Rate (Above BDT 1,600,000)") 
     )
+
+
+
+write.csv(bgd_data, file = "../clean_data/adaptation_observatory_bgd_cleaned_survey_questions_R1.csv")
 ```
 
 
@@ -202,8 +220,21 @@ ind_data
 length(unique(ind_data$response_id))
 
 # let's further investigate the variance in responses
-dup_ip_ind <- ind %>% 
-  filter(no_surverys_submitted > 1)
+dup_ip_ind <- ind_data %>% 
+  filter(no_surverys_submitted > 1) %>% 
+  mutate(income_brackets = case_when(
+    demo_income <= 300000 ~ "0% Tax Rate (Up to BDT 300,000)",
+    demo_income > 300000 & demo_income <= 400000 ~ "5% Tax Rate (BDT 300,001 - 400,000)",
+    demo_income > 400000 & demo_income <= 700000 ~ "10% Tax Rate (BDT 400,001 - 700,000)",
+    demo_income > 700000 & demo_income <= 1100000 ~ "15% Tax Rate (BDT 700,001 - 1,100,000)",
+    demo_income > 1100000 & demo_income <= 1600000 ~ "20% Tax Rate (BDT 1,100,001 - 1,600,000)",
+    demo_income > 1600000 ~ "25% Tax Rate (Above BDT 1,600,000)") 
+    )
+
+length(unique(dup_ip_ind$comp_phone1_try1))
+
+
+write.csv(dup_ip_ind, file = "adaptation_observatory_ind_cleaned_duplicate_survey_questions_R1.csv")
 ```
 
 # What tax brackets are represented here? `demo_income`
@@ -219,6 +250,9 @@ ind_data <- ind_data %>%
     demo_income > 1200000 & demo_income <= 1500000 ~ "20% Tax Rate (Rs. 12,00,001 - 15,00,000)",
     demo_income > 1500000 ~ "30% Tax Rate (Above Rs. 15,00,000)") 
     )
+
+
+write.csv(ind_data, file = "adaptation_observatory_ind_cleaned_survey_questions_R1.csv")
 ```
 
 ```{r}
