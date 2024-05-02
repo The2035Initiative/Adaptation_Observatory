@@ -12,6 +12,7 @@ output:
 ### 2024 April 15
 
 #### Overview & Goals 
+**Create a function to save these histograms for each category as png in a folder to look at later**
 - Visuals of the response distributions from each demo. group
 - Visualizing the difference in the responses from those duplicates
 
