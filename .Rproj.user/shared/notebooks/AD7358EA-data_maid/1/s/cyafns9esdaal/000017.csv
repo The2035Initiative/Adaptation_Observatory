@@ -1,0 +1,8 @@
+"0","bgd_aoi <-  st_intersection(bgd_aoi, bgd_adm2) %>% 
+  
+  dplyr::select(adm1_boundary, adm2_boundary, geometry) %>% 
+  
+  group_by(adm1_boundary) %>% 
+  group_by(adm2_boundary)
+"
+"2","Warning: attribute variables are assumed to be spatially constant throughout all geometries"

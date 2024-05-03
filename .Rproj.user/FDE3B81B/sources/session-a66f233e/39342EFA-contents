@@ -1,0 +1,1891 @@
+---
+title: "Descriptive Demographic Response Distributions"
+author: "Sofia Ingersoll"
+output:
+  html-document:
+    code_folding: show
+    toc: true
+    toc_float: true
+---
+# Adaptation Observatory Responses
+## India & Bangladesh
+### 2024 April 15
+
+#### Overview & Goals 
+**Create a function to save these histograms for each category as png in a folder to look at later**
+- Visuals of the response distributions from each demo. group
+- Visualizing the difference in the responses from those duplicates
+
+- Isolate quality respondents, their locations and the boundary of cell tower locations
+
+- Break down of each topic, then note the ones with the greatest variation
+
+- i should create break downs of each demogs, responses as it’s own histogram
+
+- so function to sort by gender and age, then display other things
+
+- also have one just for gender age + demo gender age
+
+#### Set up
+```{r}
+library(here)
+library(tidyverse)
+library(RColorBrewer)
+```
+
+
+
+```{r}
+# load BGD data 
+bgd <- read_csv("../clean_data/adaptation_observatory_bgd_cleaned_survey_questions_R1.csv",
+                show_col_types = FALSE)
+# group duplicated by phone & ip
+bgd_dup <- read_csv("../clean_data/adaptation_observatory_bgd_cleaned_duplicate_survey_questions_R1.csv",
+                    show_col_types = FALSE) 
+
+
+# load IND data 
+ind <- read_csv("../clean_data/adaptation_observatory_ind_cleaned_survey_questions_R1.csv",
+                show_col_types = FALSE)
+# group duplicated by phone & ip
+ind_dup <- read_csv("../clean_data/adaptation_observatory_ind_cleaned_duplicate_survey_questions_R1.csv",
+                    show_col_types = FALSE) 
+```
+
+
+IDEAS
+```{r}
+colnames(ind)
+```
+
+
+GROUP BY AGE & GENDER: DISPLAY COUNT OF ANSWER 
+subset data or select group
+
+x = answer
+y = count
+
+GROUPING BY GENDER AND AGE GROUPS
+
+Age groups:
+age >= 18 & age < 30
+age >= 30 & age < 50
+age >= 50 
+
+color = gender
+
+#### BGD
+```{r}
+# data wrangling
+plot_data_bgd <- bgd %>%  
+  mutate(age_group = case_when(
+    (age >= 18 & age < 30) ~ "18-29",
+    (age >= 30 & age < 50) ~ "30-49",
+    (age >= 50) ~ "50+"
+   )) %>% 
+  mutate(age = as.integer(age)) %>% 
+  filter(!is.na(age)) %>% 
+  dplyr::select(age_group, gender, demo_gender, demo_age, age,
+         q_language, income_brackets, demo_income,
+         household_move, flood_year, stay_residence,
+         flood_close, move_rural_urban, property_loss,
+         housing_damage, flood_prepared, contact_authority,
+         enough_eat, climate_problem, trust_government,
+         region, no_surverys_submitted) 
+
+# data wrangling
+plot_data_bgd_dup <- bgd_dup %>%  
+  mutate(age_group = case_when(
+    (age >= 18 & age < 30) ~ "18-29",
+    (age >= 30 & age < 50) ~ "30-49",
+    (age >= 50) ~ "50+"
+   )) %>% 
+  mutate(age = as.integer(age)) %>% 
+  filter(!is.na(age)) %>% 
+  dplyr::select(ip_address, comp_phone1_try1, age_group,
+                gender, demo_gender, demo_age, age,
+                q_language, income_brackets, demo_income,
+                household_move, flood_year, stay_residence,
+                flood_close, move_rural_urban, property_loss,
+                housing_damage, flood_prepared, contact_authority,
+                enough_eat, climate_problem, trust_government,
+                no_surverys_submitted, region) 
+
+plot_data_bgd
+```
+
+#### IND 
+```{r}
+# data wrangling
+plot_data_ind <- ind %>%  
+  mutate(age_group = case_when(
+    (age >= 18 & age < 30) ~ "18-29",
+    (age >= 30 & age < 50) ~ "30-49",
+    (age >= 50) ~ "50+"
+   )) %>% 
+  mutate(age = as.integer(age)) %>% 
+  filter(!is.na(age)) %>% 
+  dplyr::select(age_group, gender, demo_gender, demo_age, age,
+         q_language, income_brackets, demo_income,
+         household_move, flood_year, stay_residence,
+         flood_close, move_rural_urban, property_loss,
+         housing_damage, flood_prepared, contact_authority,
+         enough_eat, climate_problem, trust_government,
+         no_surverys_submitted, region) 
+
+
+# data wrangling
+plot_data_ind_dup <- ind_dup %>%  
+  mutate(age_group = case_when(
+    (age >= 18 & age < 30) ~ "18-29",
+    (age >= 30 & age < 50) ~ "30-49",
+    (age >= 50) ~ "50+"
+   )) %>% 
+  mutate(age = as.integer(age)) %>% 
+  filter(!is.na(age)) %>% 
+  dplyr::select(ip_address, comp_phone1_try1, age_group, gender, demo_gender, demo_age, age,
+         q_language, income_brackets, demo_income,
+         household_move, flood_year, stay_residence,
+         flood_close, move_rural_urban, property_loss,
+         housing_damage, flood_prepared, contact_authority,
+         enough_eat, climate_problem, trust_government,
+         no_surverys_submitted, region) 
+
+
+plot_data_ind_dup
+plot_data_ind
+```
+
+# Set up
+```{r}
+colors <- c("Female" = "#D16014", "Male" = "#17255A")
+#"#C4A287"
+```
+
+
+# Function for plotting survey responses using clean df
+
+```{r}
+generate_plot <- function(df, country, survey_question, round_of_surveying) {
+  # Create folder if it doesn't exist
+  folder_path <- paste0(here("response_analysis","response_visuals"))
+  if (!file.exists(folder_path)) {
+    dir.create(folder_path)
+    print(paste("Folder", folder_path, "created."))
+  }
+
+  # Save survey question as a title for plotting
+  if (survey_question %in% names(df)) {
+    # Modify survey question title
+    survey_question_title <- tools::toTitleCase(survey_question)
+    survey_question_title <- gsub("_", " ", survey_question_title)
+
+    if ("Yes" %in% df[[survey_question]] | survey_question == "income_brackets" | survey_question == "region") {
+      # Subset data for plotting 
+      plot_data <- df %>%
+        # label groups by age demo
+        mutate(age_group = fct_reorder(age_group, .data[[survey_question]])) %>%
+        mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+"))) %>%
+        # count frequency 
+        group_by(age_group, gender, .data[[survey_question]]) %>%
+        summarise(count = n()) %>%
+        ungroup() %>% 
+        # create histogram
+        ggplot(aes(fill = gender, y = .data[[survey_question]], x= age_group)) + 
+        geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
+        labs(title = paste0(country, " ", survey_question_title, " Distribution in Age Demographics"),
+             subtitle = paste0("Adaptation Observatory Survey Responses: ", round_of_surveying),
+             x = "Age Demographic Groups",
+             y = paste0("Count of ", survey_question_title)) +
+        # count of language frequency 
+        geom_text(aes(label = count,
+                      fontface = "bold"),
+                  size = 3,
+                  position = position_dodge(width = 0.9),
+                  hjust = .5,
+                  vjust = -0.4,
+                  color = "grey40") +
+        # customs
+        scale_fill_manual(values = colors) +
+        theme_classic()  +
+        theme(
+          plot.title = element_text(size = 15,
+                                    hjust = .5),
+          plot.subtitle = element_text(size = 12,
+                                       hjust = .5),
+          axis.title.y = element_text(margin = margin(t = 0, r = 10, b = 0, l = 0)) # Adjust y-axis title position
+        ) 
+
+      # Save plot as a png
+      plot_filename <- paste0(folder_path, "/", round_of_surveying, "/", country, "_", survey_question, "_response_analysis_", round_of_surveying, ".png")
+      ggsave(filename = plot_filename, plot = plot_data, width = 8, height = 5, dpi = 300)
+
+      print("Plot saved successfully.")
+    } else {
+      # Subset data for plotting 
+      plot_data <- df %>%
+        # label groups by age demo
+        mutate(age_group = fct_reorder(age_group, .data[[survey_question]])) %>%
+        mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+"))) %>%
+        # count frequency 
+        group_by(age_group, gender, .data[[survey_question]]) %>%
+        summarise(count = n()) %>%
+        ungroup() %>% 
+        # create histogram
+        ggplot(aes(fill = gender, y = .data[[survey_question]], x= age_group)) + 
+        geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
+        labs(title = paste0(country, " ", survey_question_title, " Distribution in Age Demographics"),
+             subtitle = paste0("Adaptation Observatory Survey Responses: ", round_of_surveying),
+             x = "Age Demographic Groups",
+             y = paste0("Count of ",survey_question_title)) +
+        # count of language frequency 
+        geom_text(aes(label = count,
+                      fontface = "bold"),
+                  size = 3,
+                  position = position_dodge(width = 0.9),
+                  hjust = -1.5,
+                  vjust = 0.4,
+                  color = "grey40") +
+        # customs
+        scale_fill_manual(values = colors) +
+        coord_flip() +
+        theme_classic()  +
+        theme(
+          plot.title = element_text(size = 15,
+                                    hjust = .5),
+          plot.subtitle = element_text(size = 12,
+                                       hjust = .5),
+          axis.title.y = element_text(margin = margin(t = 0, r = 10, b = 0, l = 0)) # Adjust y-axis title position
+        )
+
+      # Save plot as a png
+      plot_filename <- paste0(folder_path, "/", country, "/", round_of_surveying, "/", country, "_", survey_question, "_response_analysis_", round_of_surveying, ".png")
+      ggsave(filename = plot_filename, plot = plot_data, width = 10, height = 6, dpi = 300)
+
+      print("Plot saved successfully.")
+    } 
+  } else {
+    print("Specified survey question column does not exist in the dataframe.")
+  }
+}
+```
+
+
+```{r warning=FALSE, message=FALSE}
+generate_plot(plot_data_ind, "IND", "climate_problem", "R1")
+```
+
+
+# Duplicates 
+```{r}
+colnames(plot_data_ind_dup)
+
+# this confirms that all of the respondants here have unique 
+# 45 repeat
+repeat_bgd <- as.numeric(length(unique(bgd_dup$response_id))) - as.numeric(length(unique(bgd_dup$comp_phone1_try1)))
+
+# 6 repeat
+repeat_ind <- as.numeric(length(unique(ind_dup$response_id))) - as.numeric(length(unique(ind_dup$comp_phone1_try1)))
+
+# okay wait, i'm not confident in my approach above bc it's not looking at commonalities between the vectors
+# let's try intersect()
+
+ip_phone_combinations <- function(data) {
+  
+  # Find combinations that appear more than once
+  duplicated_combinations <- data[duplicated(data[, c("ip_address", "comp_phone1_try1")]) |
+                                  duplicated(data[, c("ip_address", "comp_phone1_try1")], fromLast = TRUE), 
+                                  c("ip_address", "comp_phone1_try1")]
+  return(duplicated_combinations)
+}
+
+
+# Example usage:
+# Assuming 'bgd_dup' is your data frame
+repeat_bgd <- ip_phone_combinations(bgd_dup)
+
+
+repeat_ind <- ip_phone_combinations(ind_dup)
+
+
+
+# using join, let's isolate all observations from duplicate phone + ip
+bgd_duplicates <- inner_join(plot_data_bgd_dup, repeat_bgd, by = c("ip_address", "comp_phone1_try1"))
+
+# save file
+write.csv(bgd_duplicates, file = "../clean_data/adaptation_observatory_bgd_cleaned_duplicate_survey_questions_R1.csv")
+
+
+# using join, let's isolate all observations from duplicate phone + ip
+ind_duplicates <- inner_join(plot_data, repeat_ind, by = c("ip_address", "comp_phone1_try1"))
+
+
+# save file
+write.csv(ind_duplicates, file = "../clean_data/adaptation_observatory_ind_cleaned_duplicate_survey_questions_R1.csv")
+```
+
+# Duplicate Iteration Function
+
+## This one to see overall duplicated data responses
+```{r}
+generate_dup_plot <- function(df, country, survey_question, round_of_surveying) {
+  # Create folder if it doesn't exist
+  folder_path <- paste0(here("response_analysis","response_visuals", country, round_of_surveying))
+  if (!file.exists(folder_path)) {
+    dir.create(folder_path)
+    print(paste("Folder", folder_path, "created."))
+  }
+
+  # Save survey question as a title for plotting
+  if (survey_question %in% names(df)) {
+    # Modify survey question title
+    survey_question_title <- tools::toTitleCase(survey_question)
+    survey_question_title <- gsub("_", " ", survey_question_title)
+
+    if ("Yes" %in% df[[survey_question]] | survey_question == "income_brackets" | survey_question == "region") {
+      # Subset data for plotting 
+      plot_data <- df %>%
+        # label groups by age demo
+        mutate(age_group = fct_reorder(age_group, .data[[survey_question]])) %>%
+        mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+"))) %>%
+        # count frequency 
+        group_by(age_group, gender, .data[[survey_question]]) %>%
+        summarise(count = n()) %>%
+        ungroup() %>% 
+        # create histogram
+        ggplot(aes(fill = gender, y = .data[[survey_question]], x= age_group)) + 
+        geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
+        labs(title = paste0(country, " ", survey_question_title, " Distribution in Age Demographics"),
+             subtitle = paste0("Adaptation Observatory Survey Responses: ", round_of_surveying),
+             x = "Age Demographic Groups",
+             y = paste0("Count of ", survey_question_title)) +
+        # count of language frequency 
+        geom_text(aes(label = count,
+                      fontface = "bold"),
+                  size = 3,
+                  position = position_dodge(width = 0.9),
+                  hjust = .5,
+                  vjust = -0.4,
+                  color = "grey40") +
+        # customs
+        scale_fill_manual(values = colors) +
+        theme_classic()  +
+        theme(
+          plot.title = element_text(size = 15,
+                                    hjust = .5),
+          plot.subtitle = element_text(size = 12,
+                                       hjust = .5),
+          axis.title.y = element_text(margin = margin(t = 0, r = 10, b = 0, l = 0)) # Adjust y-axis title position
+        ) 
+
+      # Save plot as a png
+      plot_filename <- paste0(folder_path, "/", "dup_data_vis","/","total_dup_response", "/", country, "_", survey_question, "_duplicates_response_analysis_", round_of_surveying,".png")
+      ggsave(filename = plot_filename, plot = plot_data, width = 8, height = 5, dpi = 300)
+
+      print("Plot saved successfully.")
+    } else {
+      # Subset data for plotting 
+      plot_data <- df %>%
+        # label groups by age demo
+        mutate(age_group = fct_reorder(age_group, .data[[survey_question]])) %>%
+        mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+"))) %>%
+        # count frequency 
+        group_by(age_group, gender, .data[[survey_question]]) %>%
+        summarise(count = n()) %>%
+        ungroup() %>% 
+        # create histogram
+        ggplot(aes(fill = gender, y = .data[[survey_question]], x= age_group)) + 
+        geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
+        labs(title = paste0(country, " ", survey_question_title, " Distribution in Age Demographics"),
+             subtitle = paste0("Adaptation Observatory Survey Responses: ", round_of_surveying),
+             x = "Age Demographic Groups",
+             y = paste0("Count of ",survey_question_title)) +
+        # count of language frequency 
+        geom_text(aes(label = count,
+                      fontface = "bold"),
+                  size = 3,
+                  position = position_dodge(width = 0.9),
+                  hjust = -1.5,
+                  vjust = 0.4,
+                  color = "grey40") +
+        # customs
+        scale_fill_manual(values = colors) +
+        coord_flip() +
+        theme_classic()  +
+        theme(
+          plot.title = element_text(size = 15,
+                                    hjust = .5),
+          plot.subtitle = element_text(size = 12,
+                                       hjust = .5),
+          axis.title.y = element_text(margin = margin(t = 0, r = 10, b = 0, l = 0)) # Adjust y-axis title position
+        )
+
+      # Save plot as a png
+      plot_filename <- paste0(folder_path, "/", "dup_data_vis","/","total_dup_response", "/", country, "_", survey_question, "_duplicates_response_analysis_", round_of_surveying,".png")
+      ggsave(filename = plot_filename, plot = plot_data, width = 10, height = 6, dpi = 300)
+
+      print("Plot saved successfully.")
+    } 
+  } else {
+    print("Specified survey question column does not exist in the dataframe.")
+  }
+}
+```
+
+```{r}
+generate_dup_plot(ind_duplicates, "IND", "q_language", "R1")
+```
+
+## This one to iterate by ip
+```{r}
+generate_dup_plots <- function(df, country, survey_question, round_of_surveying) {
+  # Create folder if it doesn't exist
+  folder_path <- paste0(here("response_analysis","response_visuals"))
+  if (!file.exists(folder_path)) {
+    dir.create(folder_path)
+    print(paste("Folder", folder_path, "created."))
+  }
+  
+  # Save survey question as a title for plotting
+  if (survey_question %in% names(df)) {
+    # Modify survey question title
+    survey_question_title <- tools::toTitleCase(survey_question)
+    survey_question_title <- gsub("_", " ", survey_question_title)
+    
+    # Group by IP address and comp_phone1_try1
+    grouped_df <- df %>%
+      group_by(ip_address, comp_phone1_try1) %>%
+      summarise()
+    
+    # Iterate over each group and generate individual histograms
+    for (i in 1:nrow(grouped_df)) {
+      ip <- grouped_df$ip_address[i]
+      phone <- grouped_df$comp_phone1_try1[i]
+      
+      # Subset data for the current group
+      plot_data <- df %>%
+        filter(ip_address == ip, comp_phone1_try1 == phone) %>%
+        # label groups by age demo
+        mutate(age_group = fct_reorder(age_group, .data[[survey_question]])) %>%
+        mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+", NA))) %>%
+        # count frequency 
+        group_by(age_group, gender, .data[[survey_question]]) %>%
+        summarise(count = n()) %>%
+        ungroup() %>% 
+        # create histogram
+        ggplot(aes(fill = gender, y = .data[[survey_question]], x= age_group)) + 
+        geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
+        labs(title = paste0(country, " ", survey_question_title, " Distribution in Age Demographics"),
+             subtitle = paste0("Adaptation Observatory Survey Responses: ", round_of_surveying),
+             x = "Age Demographic Groups",
+             y = paste0("Count of ", survey_question_title, " (IP:", ip, ", Phone:", phone, ")")) +
+        # count of language frequency 
+        geom_text(aes(label = count,
+                      fontface = "bold"),
+                  size = 3,
+                  position = position_dodge(width = 0.9),
+                  hjust = .5,
+                  vjust = -0.4,
+                  color = "grey40") +
+        # customs
+        scale_fill_manual(values = colors) +
+        theme_classic()  +
+        theme(
+          plot.title = element_text(size = 15,
+                                    hjust = .5),
+          plot.subtitle = element_text(size = 12,
+                                       hjust = .5),
+          axis.title.y = element_text(margin = margin(t = 0, r = 10, b = 0, l = 0)) # Adjust y-axis title position
+        ) 
+      
+      # Save plot as a png
+      plot_filename <- paste0(folder_path, "/", country, "/", round_of_surveying, "/", "dup_data_vis","/", "repeat_ip_cell","/",survey_question, "/", country, "_", survey_question, "duplicates_response_analysis_", round_of_surveying, "_IP_", ip, "_Phone_", phone, ".png")
+      ggsave(filename = plot_filename, plot = plot_data, width = 8, height = 5, dpi = 300)
+      
+      print(paste("Plot for IP:", ip, "and Phone:", phone, "saved successfully."))
+    }
+  } else {
+    print("Specified survey question column does not exist in the dataframe.")
+  }
+}
+```
+
+
+```{r}
+generate_dup_plots(ind_duplicates, "IND", "stay_residence", "R1")
+# not working
+# stay_residence 
+# flood_close 
+# property_loss 
+# housing_damage
+
+```
+# Lanuage Distribution 
+```{r fig.width=10, fig.height=6, warning=FALSE, message=FALSE}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ----         BGD           ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Grouped
+plot_data_bgd %>%
+    # label groups by age demo
+  mutate(age_group = fct_reorder(age_group, q_language)) %>%
+  mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+"))) %>%
+  
+  # count frequency 
+  group_by(age_group, gender, q_language) %>%
+  summarise(count = n()) %>%
+  ungroup() %>% 
+  
+  # create histogram
+  ggplot(aes(fill = gender, y = q_language, x= age_group)) + 
+  geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
+  
+  labs(title = "BGD Qualtrics Language Distribution in Age Demographics",
+       subtitle = "Adaptation Observatory Survey Responses: 2024 April 15",
+       x = "Age Demographic Groups",
+       y = "Qualtric Detected Languages") +
+  
+  # count of language frequency 
+  geom_text(aes(label = count,
+                fontface = "bold"),
+            size = 3,
+            position = position_dodge(width = 0.9),
+            hjust = -1.5,
+            vjust = 0.4,
+            color = "grey40") +
+  
+  # customs
+  scale_fill_manual(values = colors) +
+  
+  
+  theme_classic()  +
+  
+  theme(
+    plot.title = element_text(size = 15,
+                         hjust = .5),
+    
+    plot.subtitle = element_text(size = 12,
+                            hjust = .5)
+    
+  ) +
+  
+  coord_flip()
+ 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ----        India          ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Subset data for plotting 
+plot_data_ind %>%
+  
+  # label groups by age demo
+  mutate(age_group = fct_reorder(age_group, q_language)) %>%
+  mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+"))) %>%
+  
+  # count frequency 
+  group_by(age_group, gender, q_language) %>%
+  summarise(count = n()) %>%
+  ungroup() %>% 
+  
+  # create histogram
+  ggplot(aes(fill = gender, y = q_language, x= age_group)) + 
+  geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
+  
+  labs(title = "IND Qualtrics Language Distribution in Age Demographics",
+       subtitle = "Adaptation Observatory Survey Responses: 2024 April 15",
+       x = "Age Demographic Groups",
+       y = "Qualtric Detected Languages") +
+  
+  # count of language frequency 
+  geom_text(aes(label = count,
+                fontface = "bold"),
+            size = 3,
+            position = position_dodge(width = 0.9),
+            hjust = -1.5,
+            vjust = 0.4,
+            color = "grey40") +
+  
+  # customs
+  scale_fill_manual(values = colors) +
+  
+  
+  theme_classic()  +
+  
+  theme(
+    plot.title = element_text(size = 15,
+                         hjust = .5),
+    
+    plot.subtitle = element_text(size = 12,
+                            hjust = .5)
+    
+  ) +
+  
+  coord_flip()
+```
+# Income Brackets 
+```{r fig.width=12, fig.height=5, warning=FALSE, message=FALSE}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ----         BGD           ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Plotting the 5 income brackets
+plot_data_bgd %>%
+    # label groups by age demo
+  mutate(age_group = fct_reorder(age_group, income_brackets)) %>%
+  mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+"))) %>%
+  
+  # count frequency 
+  group_by(age_group, gender, income_brackets) %>%
+  summarise(count = n()) %>%
+  ungroup() %>% 
+  # create histogram
+  ggplot(aes(fill = gender,
+             y = income_brackets,
+             x = age_group)) + 
+  geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
+  
+  labs(title = "BGD Income Bracket Distribution in Age Demographics",
+       subtitle = "Adaptation Observatory Survey Responses: 2024 April 15",
+       x = "Age Demographic Groups",
+       y = "Tax Brackets") +
+  
+  # count of language frequency 
+  geom_text(aes(label = count,
+                fontface = "bold"),
+            size = 3,
+            position = position_dodge(width = 0.9),
+            hjust = .5,
+            vjust = -1,
+            color = "grey40") +
+  
+  # customs
+  scale_fill_manual(values = colors) +
+  
+  
+  theme_classic()  +
+  
+  theme(
+    plot.title = element_text(size = 15,
+                         hjust = .5),
+    
+    plot.subtitle = element_text(size = 12,
+                            hjust = .5)
+    
+  )
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ----        India          ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Plotting the 5 income brackets
+plot_data_ind %>%
+    # label groups by age demo
+  mutate(age_group = fct_reorder(age_group, income_brackets)) %>%
+  mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+"))) %>%
+  
+  # count frequency 
+  group_by(age_group, gender, income_brackets) %>%
+  summarise(count = n()) %>%
+  ungroup() %>% 
+  # create histogram
+  ggplot(aes(fill = gender,
+             y = income_brackets,
+             x = age_group)) + 
+  geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
+  
+  labs(title = "IND Income Bracket Distribution in Age Demographics",
+       subtitle = "Adaptation Observatory Survey Responses: 2024 April 15",
+       x = "Age Demographic Groups",
+       y = "Tax Brackets") +
+  
+  # count of language frequency 
+  geom_text(aes(label = count,
+                fontface = "bold"),
+            size = 3,
+            position = position_dodge(width = 0.9),
+            hjust = .5,
+            vjust = -1,
+            color = "grey40") +
+  
+  # customs
+  scale_fill_manual(values = colors) +
+  
+  
+  theme_classic()  +
+  
+  theme(
+    plot.title = element_text(size = 15,
+                         hjust = .5),
+    
+    plot.subtitle = element_text(size = 12,
+                            hjust = .5)
+    
+  ) 
+```
+# Household Move
+```{r fig.width=8, fig.height=5, warning=FALSE, message=FALSE}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ----         BGD           ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Subset data for plotting 
+plot_data_bgd %>%
+  
+  # label groups by age demo
+  mutate(age_group = fct_reorder(age_group, household_move)) %>%
+  mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+"))) %>%
+  
+  # count frequency 
+  group_by(age_group, gender, household_move) %>%
+  summarise(count = n()) %>%
+  ungroup() %>% 
+  
+  # create histogram
+  ggplot(aes(fill = gender, y = household_move, x= age_group)) + 
+  geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
+  
+  labs(title = "BGD Household Move Distribution in Age Demographics",
+       subtitle = "Adaptation Observatory Survey Responses: 2024 April 15",
+       x = "Age Demographic Groups",
+       y = "Survey Response") +
+  
+  # count of language frequency 
+  geom_text(aes(label = count,
+                fontface = "bold"),
+            size = 3,
+            position = position_dodge(width = 0.9),
+            hjust = .5,
+            vjust = -0.4,
+            color = "grey40") +
+  
+  # customs
+  scale_fill_manual(values = colors) +
+  
+  
+  theme_classic()  +
+  
+  theme(
+    plot.title = element_text(size = 15,
+                         hjust = .5),
+    
+    plot.subtitle = element_text(size = 12,
+                            hjust = .5)
+    
+  ) 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ----        India          ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Subset data for plotting 
+plot_data_ind %>%
+  
+  # label groups by age demo
+  mutate(age_group = fct_reorder(age_group, household_move)) %>%
+  mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+"))) %>%
+  
+  # count frequency 
+  group_by(age_group, gender, household_move) %>%
+  summarise(count = n()) %>%
+  ungroup() %>% 
+  
+  # create histogram
+  ggplot(aes(fill = gender, y = household_move, x= age_group)) + 
+  geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
+  
+  labs(title = "IND Household Move Distribution in Age Demographics",
+       subtitle = "Adaptation Observatory Survey Responses: 2024 April 15",
+       x = "Age Demographic Groups",
+       y = "Survey Response") +
+  
+  # count of language frequency 
+  geom_text(aes(label = count,
+                fontface = "bold"),
+            size = 3,
+            position = position_dodge(width = 0.9),
+            hjust = .5,
+            vjust = -0.4,
+            color = "grey40") +
+  
+  # customs
+  scale_fill_manual(values = colors) +
+  
+  
+  theme_classic()  +
+  
+  theme(
+    plot.title = element_text(size = 15,
+                         hjust = .5),
+    
+    plot.subtitle = element_text(size = 12,
+                            hjust = .5)
+    
+  ) 
+```
+
+# Flood Year
+```{r fig.width=8, fig.height=5, warning=FALSE, message=FALSE}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ----         BGD           ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Subset data for plotting 
+plot_data_bgd %>%
+  
+  # label groups by age demo
+  mutate(age_group = fct_reorder(age_group, flood_year)) %>%
+  mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+"))) %>%
+  
+  # count frequency 
+  group_by(age_group, gender, flood_year) %>%
+  summarise(count = n()) %>%
+  ungroup() %>% 
+  
+  # create histogram
+  ggplot(aes(fill = gender, y = flood_year, x= age_group)) + 
+  geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
+  
+  labs(title = "BGD Flood Year Distribution in Age Demographics",
+       subtitle = "Adaptation Observatory Survey Responses: 2024 April 15",
+       x = "Age Demographic Groups",
+       y = "Survey Response") +
+  
+  # count of language frequency 
+  geom_text(aes(label = count,
+                fontface = "bold"),
+            size = 3,
+            position = position_dodge(width = 0.9),
+            hjust = .5,
+            vjust = -0.4,
+            color = "grey40") +
+  
+  # customs
+  scale_fill_manual(values = colors) +
+  
+  
+  theme_classic()  +
+  
+  theme(
+    plot.title = element_text(size = 15,
+                         hjust = .5),
+    
+    plot.subtitle = element_text(size = 12,
+                            hjust = .5)
+    
+  ) 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ----        India          ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Subset data for plotting 
+plot_data_ind %>%
+  
+  # label groups by age demo
+  mutate(age_group = fct_reorder(age_group, flood_year)) %>%
+  mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+"))) %>%
+  
+  # count frequency 
+  group_by(age_group, gender, flood_year) %>%
+  summarise(count = n()) %>%
+  ungroup() %>% 
+  
+  # create histogram
+  ggplot(aes(fill = gender, y = flood_year, x= age_group)) + 
+  geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
+  
+  labs(title = "IND Flood Year Distribution in Age Demographics",
+       subtitle = "Adaptation Observatory Survey Responses: 2024 April 15",
+       x = "Age Demographic Groups",
+       y = "Survey Response") +
+  
+  # count of language frequency 
+  geom_text(aes(label = count,
+                fontface = "bold"),
+            size = 3,
+            position = position_dodge(width = 0.9),
+            hjust = .5,
+            vjust = -0.4,
+            color = "grey40") +
+  
+  # customs
+  scale_fill_manual(values = colors) +
+  
+  
+  theme_classic()  +
+  
+  theme(
+    plot.title = element_text(size = 15,
+                         hjust = .5),
+    
+    plot.subtitle = element_text(size = 12,
+                            hjust = .5)
+    
+  ) 
+```
+# Stay Residence
+```{r fig.width=8, fig.height=5, warning=FALSE, message=FALSE}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ----         BGD           ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Subset data for plotting 
+plot_data_bgd %>%
+  # label groups by age demo
+  mutate(age_group = fct_reorder(age_group, stay_residence)) %>%
+  mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+"))) %>%
+  
+  # count frequency 
+  group_by(age_group, gender, stay_residence) %>%
+  summarise(count = n()) %>%
+  ungroup() %>% 
+  
+  # create histogram
+  ggplot(aes(fill = gender, y = stay_residence, x= age_group)) + 
+  geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
+  
+  labs(title = "BGD Stay Residence Distribution in Age Demographics",
+       subtitle = "Adaptation Observatory Survey Responses: 2024 April 15",
+       x = "Age Demographic Groups",
+       y = "Survey Response") +
+  
+  # count of language frequency 
+  geom_text(aes(label = count,
+                fontface = "bold"),
+            size = 3,
+            position = position_dodge(width = 0.9),
+            hjust = .5,
+            vjust = -0.4,
+            color = "grey40") +
+  
+  # customs
+  scale_fill_manual(values = colors) +
+  
+  
+  theme_classic()  +
+  
+  theme(
+    plot.title = element_text(size = 15,
+                         hjust = .5),
+    
+    plot.subtitle = element_text(size = 12,
+                            hjust = .5)
+    
+  ) 
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ----       India           ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Subset data for plotting 
+plot_data_ind %>%
+  # label groups by age demo
+  mutate(age_group = fct_reorder(age_group, stay_residence)) %>%
+  mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+"))) %>%
+  
+  # count frequency 
+  group_by(age_group, gender, stay_residence) %>%
+  summarise(count = n()) %>%
+  ungroup() %>% 
+  
+  # create histogram
+  ggplot(aes(fill = gender, y = stay_residence, x= age_group)) + 
+  geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
+  
+  labs(title = "IND Stay Residence Distribution in Age Demographics",
+       subtitle = "Adaptation Observatory Survey Responses: 2024 April 15",
+       x = "Age Demographic Groups",
+       y = "Survey Response") +
+  
+  # count of language frequency 
+  geom_text(aes(label = count,
+                fontface = "bold"),
+            size = 3,
+            position = position_dodge(width = 0.9),
+            hjust = .5,
+            vjust = -0.4,
+            color = "grey40") +
+  
+  # customs
+  scale_fill_manual(values = colors) +
+  
+  
+  theme_classic()  +
+  
+  theme(
+    plot.title = element_text(size = 15,
+                         hjust = .5),
+    
+    plot.subtitle = element_text(size = 12,
+                            hjust = .5)
+    
+  ) 
+```
+# Flood Close
+```{r fig.width=8, fig.height=5, warning=FALSE, message=FALSE}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ----         BGD           ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Subset data for plotting 
+plot_data_bgd %>%
+  # label groups by age demo
+  mutate(age_group = fct_reorder(age_group, flood_close)) %>%
+  mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+"))) %>%
+  
+  # count frequency 
+  group_by(age_group, gender, flood_close) %>%
+  summarise(count = n()) %>%
+  ungroup() %>% 
+  
+  # create histogram
+  ggplot(aes(fill = gender, y = flood_close, x= age_group)) + 
+  geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
+  
+  labs(title = "BGD Flood Close Distribution in Age Demographics",
+       subtitle = "Adaptation Observatory Survey Responses: 2024 April 15",
+       x = "Age Demographic Groups",
+       y = "Survey Response") +
+  
+  # count of language frequency 
+  geom_text(aes(label = count,
+                fontface = "bold"),
+            size = 3,
+            position = position_dodge(width = 0.9),
+            hjust = .5,
+            vjust = -0.4,
+            color = "grey40") +
+  
+  # customs
+  scale_fill_manual(values = colors) +
+  
+  
+  theme_classic()  +
+  
+  theme(
+    plot.title = element_text(size = 15,
+                         hjust = .5),
+    
+    plot.subtitle = element_text(size = 12,
+                            hjust = .5)
+    
+  )
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ----         IND           ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Subset data for plotting 
+plot_data_bgd %>%
+  # label groups by age demo
+  mutate(age_group = fct_reorder(age_group, flood_close)) %>%
+  mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+"))) %>%
+  
+  # count frequency 
+  group_by(age_group, gender, flood_close) %>%
+  summarise(count = n()) %>%
+  ungroup() %>% 
+  
+  # create histogram
+  ggplot(aes(fill = gender, y = flood_close, x= age_group)) + 
+  geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
+  
+  labs(title = "IND Flood Close Distribution in Age Demographics",
+       subtitle = "Adaptation Observatory Survey Responses: 2024 April 15",
+       x = "Age Demographic Groups",
+       y = "Survey Response") +
+  
+  # count of language frequency 
+  geom_text(aes(label = count,
+                fontface = "bold"),
+            size = 3,
+            position = position_dodge(width = 0.9),
+            hjust = .5,
+            vjust = -0.4,
+            color = "grey40") +
+  
+  # customs
+  scale_fill_manual(values = colors) +
+  
+  
+  theme_classic()  +
+  
+  theme(
+    plot.title = element_text(size = 15,
+                         hjust = .5),
+    
+    plot.subtitle = element_text(size = 12,
+                            hjust = .5)
+    
+  ) 
+```
+# Move Rural Urban
+```{r fig.width=8, fig.height=5, warning=FALSE, message=FALSE}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ----         BGD           ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Subset data for plotting 
+plot_data_bgd %>%
+  # label groups by age demo
+  mutate(age_group = fct_reorder(age_group, move_rural_urban)) %>%
+  mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+"))) %>%
+  
+  # count frequency 
+  group_by(age_group, gender, move_rural_urban) %>%
+  summarise(count = n()) %>%
+  ungroup() %>% 
+  
+  # create histogram
+  ggplot(aes(fill = gender, y = move_rural_urban, x= age_group)) + 
+  geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
+  
+  labs(title = "BGD Move Rural Urban Distribution in Age Demographics",
+       subtitle = "Adaptation Observatory Survey Responses: 2024 April 15",
+       x = "Age Demographic Groups",
+       y = "Survey Response") +
+  
+  # count of language frequency 
+  geom_text(aes(label = count,
+                fontface = "bold"),
+            size = 3,
+            position = position_dodge(width = 0.9),
+            hjust = .5,
+            vjust = -0.4,
+            color = "grey40") +
+  
+  # customs
+  scale_fill_manual(values = colors) +
+  
+  
+  theme_classic()  +
+  
+  theme(
+    plot.title = element_text(size = 15,
+                         hjust = .5),
+    
+    plot.subtitle = element_text(size = 12,
+                            hjust = .5)
+    
+  ) 
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ----         IND           ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Subset data for plotting 
+plot_data_ind %>%
+  # label groups by age demo
+  mutate(age_group = fct_reorder(age_group, move_rural_urban)) %>%
+  mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+"))) %>%
+  
+  # count frequency 
+  group_by(age_group, gender, move_rural_urban) %>%
+  summarise(count = n()) %>%
+  ungroup() %>% 
+  
+  # create histogram
+  ggplot(aes(fill = gender, y = move_rural_urban, x= age_group)) + 
+  geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
+  
+  labs(title = "IND Move Rural Urban Distribution in Age Demographics",
+       subtitle = "Adaptation Observatory Survey Responses: 2024 April 15",
+       x = "Age Demographic Groups",
+       y = "Survey Response") +
+  
+  # count of language frequency 
+  geom_text(aes(label = count,
+                fontface = "bold"),
+            size = 3,
+            position = position_dodge(width = 0.9),
+            hjust = .5,
+            vjust = -0.4,
+            color = "grey40") +
+  
+  # customs
+  scale_fill_manual(values = colors) +
+  
+  
+  theme_classic()  +
+  
+  theme(
+    plot.title = element_text(size = 15,
+                         hjust = .5),
+    
+    plot.subtitle = element_text(size = 12,
+                            hjust = .5)
+    
+  ) 
+```
+# Property Loss
+```{r fig.width=8, fig.height=5, warning=FALSE, message=FALSE}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ----         BGD           ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Subset data for plotting 
+plot_data_bgd %>%
+  # label groups by age demo
+  mutate(age_group = fct_reorder(age_group, property_loss)) %>%
+  mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+"))) %>%
+  
+  # count frequency 
+  group_by(age_group, gender, property_loss) %>%
+  summarise(count = n()) %>%
+  ungroup() %>% 
+  
+  # create histogram
+  ggplot(aes(fill = gender, y = property_loss, x= age_group)) + 
+  geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
+  
+  labs(title = "BGD Property Loss Distribution in Age Demographics",
+       subtitle = "Adaptation Observatory Survey Responses: 2024 April 15",
+       x = "Age Demographic Groups",
+       y = "Survey Response") +
+  
+  # count of language frequency 
+  geom_text(aes(label = count,
+                fontface = "bold"),
+            size = 3,
+            position = position_dodge(width = 0.9),
+            hjust = .5,
+            vjust = -0.4,
+            color = "grey40") +
+  
+  # customs
+  scale_fill_manual(values = colors) +
+  
+  
+  theme_classic()  +
+  
+  theme(
+    plot.title = element_text(size = 15,
+                         hjust = .5),
+    
+    plot.subtitle = element_text(size = 12,
+                            hjust = .5)
+    
+  ) 
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ----         IND           ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Subset data for plotting 
+plot_data_ind %>%
+  # label groups by age demo
+  mutate(age_group = fct_reorder(age_group, property_loss)) %>%
+  mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+"))) %>%
+  
+  # count frequency 
+  group_by(age_group, gender, property_loss) %>%
+  summarise(count = n()) %>%
+  ungroup() %>% 
+  
+  # create histogram
+  ggplot(aes(fill = gender, y = property_loss, x= age_group)) + 
+  geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
+  
+  labs(title = "IND Property Loss Distribution in Age Demographics",
+       subtitle = "Adaptation Observatory Survey Responses: 2024 April 15",
+       x = "Age Demographic Groups",
+       y = "Survey Response") +
+  
+  # count of language frequency 
+  geom_text(aes(label = count,
+                fontface = "bold"),
+            size = 3,
+            position = position_dodge(width = 0.9),
+            hjust = .5,
+            vjust = -0.4,
+            color = "grey40") +
+  
+  # customs
+  scale_fill_manual(values = colors) +
+  
+  
+  theme_classic()  +
+  
+  theme(
+    plot.title = element_text(size = 15,
+                         hjust = .5),
+    
+    plot.subtitle = element_text(size = 12,
+                            hjust = .5)
+    
+  ) 
+```
+# Housing Damage
+```{r fig.width=8, fig.height=5, warning=FALSE, message=FALSE}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ----         BGD           ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Subset data for plotting 
+plot_data_bgd %>%
+  # label groups by age demo
+  mutate(age_group = fct_reorder(age_group, housing_damage)) %>%
+  mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+"))) %>%
+  
+  # count frequency 
+  group_by(age_group, gender, housing_damage) %>%
+  summarise(count = n()) %>%
+  ungroup() %>% 
+  
+  # create histogram
+  ggplot(aes(fill = gender, y = housing_damage, x= age_group)) + 
+  geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
+  
+  labs(title = "BGD Housing Damage Distribution in Age Demographics",
+       subtitle = "Adaptation Observatory Survey Responses: 2024 April 15",
+       x = "Age Demographic Groups",
+       y = "Survey Response") +
+  
+  # count of language frequency 
+  geom_text(aes(label = count,
+                fontface = "bold"),
+            size = 3,
+            position = position_dodge(width = 0.9),
+            hjust = .5,
+            vjust = -0.4,
+            color = "grey40") +
+  
+  # customs
+  scale_fill_manual(values = colors) +
+  
+  
+  theme_classic()  +
+  
+  theme(
+    plot.title = element_text(size = 15,
+                         hjust = .5),
+    
+    plot.subtitle = element_text(size = 12,
+                            hjust = .5)
+    
+  ) 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ----         IND           ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Subset data for plotting 
+plot_data_ind %>%
+  # label groups by age demo
+  mutate(age_group = fct_reorder(age_group, housing_damage)) %>%
+  mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+"))) %>%
+  
+  # count frequency 
+  group_by(age_group, gender, housing_damage) %>%
+  summarise(count = n()) %>%
+  ungroup() %>% 
+  
+  # create histogram
+  ggplot(aes(fill = gender, y = housing_damage, x= age_group)) + 
+  geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
+  
+  labs(title = "IND Housing Damage Distribution in Age Demographics",
+       subtitle = "Adaptation Observatory Survey Responses: 2024 April 15",
+       x = "Age Demographic Groups",
+       y = "Survey Response") +
+  
+  # count of language frequency 
+  geom_text(aes(label = count,
+                fontface = "bold"),
+            size = 3,
+            position = position_dodge(width = 0.9),
+            hjust = .5,
+            vjust = -0.4,
+            color = "grey40") +
+  
+  # customs
+  scale_fill_manual(values = colors) +
+  
+  
+  theme_classic()  +
+  
+  theme(
+    plot.title = element_text(size = 15,
+                         hjust = .5),
+    
+    plot.subtitle = element_text(size = 12,
+                            hjust = .5)
+    
+  )
+```
+# Flood Prepared
+```{r fig.width=10, fig.height=5, warning=FALSE, message=FALSE}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ----         BGD           ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Subset data for plotting 
+plot_data_bgd %>%
+  # label groups by age demo
+  mutate(age_group = fct_reorder(age_group, flood_prepared)) %>%
+  mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+"))) %>%
+  
+  # count frequency 
+  group_by(age_group, gender, flood_prepared) %>%
+  summarise(count = n()) %>%
+  ungroup() %>% 
+  
+  # create histogram
+  ggplot(aes(fill = gender, y = flood_prepared, x= age_group)) + 
+  geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
+  
+  labs(title = "BGD Flood Prepared Distribution in Age Demographics",
+       subtitle = "Adaptation Observatory Survey Responses: 2024 April 15",
+       x = "Age Demographic Groups",
+       y = "Survey Response") +
+  
+  # count of language frequency 
+  geom_text(aes(label = count,
+                fontface = "bold"),
+            size = 3,
+            position = position_dodge(width = 0.9),
+            hjust = -1.5,
+            vjust = 0.4,
+            color = "grey40") +
+  
+  # customs
+  scale_fill_manual(values = colors) +
+  
+  
+  theme_classic()  +
+  
+  theme(
+    plot.title = element_text(size = 15,
+                         hjust = .5),
+    
+    plot.subtitle = element_text(size = 12,
+                            hjust = .5)
+    
+  ) +
+  
+  coord_flip()
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ----         IND           ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Subset data for plotting 
+plot_data_ind %>%
+  # label groups by age demo
+  mutate(age_group = fct_reorder(age_group, flood_prepared)) %>%
+  mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+"))) %>%
+  
+  # count frequency 
+  group_by(age_group, gender, flood_prepared) %>%
+  summarise(count = n()) %>%
+  ungroup() %>% 
+  
+  # create histogram
+  ggplot(aes(fill = gender, y = flood_prepared, x= age_group)) + 
+  geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
+  
+  labs(title = "IND Flood Prepared Distribution in Age Demographics",
+       subtitle = "Adaptation Observatory Survey Responses: 2024 April 15",
+       x = "Age Demographic Groups",
+       y = "Survey Response") +
+  
+  # count of language frequency 
+  geom_text(aes(label = count,
+                fontface = "bold"),
+            size = 3,
+            position = position_dodge(width = 0.9),
+            hjust = -1.5,
+            vjust = 0.4,
+            color = "grey40") +
+  
+  # customs
+  scale_fill_manual(values = colors) +
+  
+  
+  theme_classic()  +
+  
+  theme(
+    plot.title = element_text(size = 15,
+                         hjust = .5),
+    
+    plot.subtitle = element_text(size = 12,
+                            hjust = .5)
+    
+  ) +
+  coord_flip()
+```
+# Contact Authority
+```{r fig.width=8, fig.height=5, warning=FALSE, message=FALSE}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ----         BGD           ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Subset data for plotting 
+plot_data_bgd %>%
+  # label groups by age demo
+  mutate(age_group = fct_reorder(age_group, contact_authority)) %>%
+  mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+"))) %>%
+  
+  # count frequency 
+  group_by(age_group, gender, contact_authority) %>%
+  summarise(count = n()) %>%
+  ungroup() %>% 
+  
+  # create histogram
+  ggplot(aes(fill = gender, y = contact_authority, x= age_group)) + 
+  geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
+  
+  labs(title = "BGD Contact Authority Distribution in Age Demographics",
+       subtitle = "Adaptation Observatory Survey Responses: 2024 April 15",
+       x = "Age Demographic Groups",
+       y = "Survey Response") +
+  
+  # count of language frequency 
+  geom_text(aes(label = count,
+                fontface = "bold"),
+            size = 3,
+            position = position_dodge(width = 0.9),
+            hjust = .5,
+            vjust = -0.4,
+            color = "grey40") +
+  
+  # customs
+  scale_fill_manual(values = colors) +
+  
+  
+  theme_classic()  +
+  
+  theme(
+    plot.title = element_text(size = 15,
+                         hjust = .5),
+    
+    plot.subtitle = element_text(size = 12,
+                            hjust = .5)
+    
+  )
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ----         IND           ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Subset data for plotting 
+plot_data_ind %>%
+  # label groups by age demo
+  mutate(age_group = fct_reorder(age_group, contact_authority)) %>%
+  mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+"))) %>%
+  
+  # count frequency 
+  group_by(age_group, gender, contact_authority) %>%
+  summarise(count = n()) %>%
+  ungroup() %>% 
+  
+  # create histogram
+  ggplot(aes(fill = gender, y = contact_authority, x= age_group)) + 
+  geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
+  
+  labs(title = "IND Contact Authority Distribution in Age Demographics",
+       subtitle = "Adaptation Observatory Survey Responses: 2024 April 15",
+       x = "Age Demographic Groups",
+       y = "Survey Response") +
+  
+  # count of language frequency 
+  geom_text(aes(label = count,
+                fontface = "bold"),
+            size = 3,
+            position = position_dodge(width = 0.9),
+            hjust = .5,
+            vjust = -0.4,
+            color = "grey40") +
+  
+  # customs
+  scale_fill_manual(values = colors) +
+  
+  
+  theme_classic()  +
+  
+  theme(
+    plot.title = element_text(size = 15,
+                         hjust = .5),
+    
+    plot.subtitle = element_text(size = 12,
+                            hjust = .5)
+    
+  )
+```
+
+# Enough Eat
+```{r fig.width=8, fig.height=5, warning=FALSE, message=FALSE}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ----         BGD           ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Subset data for plotting 
+plot_data_bgd %>%
+  # label groups by age demo
+  mutate(age_group = fct_reorder(age_group, enough_eat)) %>%
+  mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+"))) %>%
+  
+  # count frequency 
+  group_by(age_group, gender, enough_eat) %>%
+  summarise(count = n()) %>%
+  ungroup() %>% 
+  
+  # create histogram
+  ggplot(aes(fill = gender, y = enough_eat, x= age_group)) + 
+  geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
+  
+  labs(title = "BGD Enough Eat Distribution in Age Demographics",
+       subtitle = "Adaptation Observatory Survey Responses: 2024 April 15",
+       x = "Age Demographic Groups",
+       y = "Survey Response") +
+  
+  # count of language frequency 
+  geom_text(aes(label = count,
+                fontface = "bold"),
+            size = 3,
+            position = position_dodge(width = 0.9),
+            hjust = .5,
+            vjust = -0.4,
+            color = "grey40") +
+  
+  # customs
+  scale_fill_manual(values = colors) +
+  
+  
+  theme_classic()  +
+  
+  theme(
+    plot.title = element_text(size = 15,
+                         hjust = .5),
+    
+    plot.subtitle = element_text(size = 12,
+                            hjust = .5)
+    
+  )
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ----         IND           ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Subset data for plotting 
+plot_data_ind %>%
+  # label groups by age demo
+  mutate(age_group = fct_reorder(age_group, enough_eat)) %>%
+  mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+"))) %>%
+  
+  # count frequency 
+  group_by(age_group, gender, enough_eat) %>%
+  summarise(count = n()) %>%
+  ungroup() %>% 
+  
+  # create histogram
+  ggplot(aes(fill = gender, y = enough_eat, x= age_group)) + 
+  geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
+  
+  labs(title = "IND Enough Eat Distribution in Age Demographics",
+       subtitle = "Adaptation Observatory Survey Responses: 2024 April 15",
+       x = "Age Demographic Groups",
+       y = "Survey Response") +
+  
+  # count of language frequency 
+  geom_text(aes(label = count,
+                fontface = "bold"),
+            size = 3,
+            position = position_dodge(width = 0.9),
+            hjust = .5,
+            vjust = -0.4,
+            color = "grey40") +
+  
+  # customs
+  scale_fill_manual(values = colors) +
+  
+  
+  theme_classic()  +
+  
+  theme(
+    plot.title = element_text(size = 15,
+                         hjust = .5),
+    
+    plot.subtitle = element_text(size = 12,
+                            hjust = .5)
+    
+  )
+```
+
+# Climate Problem
+```{r fig.width=10, fig.height=5, warning=FALSE, message=FALSE}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ----         BGD           ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Subset data for plotting 
+plot_data_bgd %>%
+  # label groups by age demo
+  mutate(age_group = fct_reorder(age_group, climate_problem)) %>%
+  mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+"))) %>%
+  
+  # count frequency 
+  group_by(age_group, gender, climate_problem) %>%
+  summarise(count = n()) %>%
+  ungroup() %>% 
+  
+  # create histogram
+  ggplot(aes(fill = gender, y = climate_problem, x= age_group)) + 
+  geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
+  
+  labs(title = "BGD Climate Problem Distribution in Age Demographics",
+       subtitle = "Adaptation Observatory Survey Responses: 2024 April 15",
+       x = "Age Demographic Groups",
+       y = "Survey Response") +
+  
+  # count of language frequency 
+  geom_text(aes(label = count,
+                fontface = "bold"),
+            size = 3,
+            position = position_dodge(width = 0.9),
+            hjust = -1.5,
+            vjust = 0.4,
+            color = "grey40") +
+  
+  # customs
+  scale_fill_manual(values = colors) +
+  
+  
+  theme_classic()  +
+  
+  theme(
+    plot.title = element_text(size = 15,
+                         hjust = .5),
+    
+    plot.subtitle = element_text(size = 12,
+                            hjust = .5)
+  ) +
+  
+  coord_flip()
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ----         IND           ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Subset data for plotting 
+plot_data_ind %>%
+  # label groups by age demo
+  mutate(age_group = fct_reorder(age_group, climate_problem)) %>%
+  mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+"))) %>%
+  
+  # count frequency 
+  group_by(age_group, gender, climate_problem) %>%
+  summarise(count = n()) %>%
+  ungroup() %>% 
+  
+  # create histogram
+  ggplot(aes(fill = gender, y = climate_problem, x= age_group)) + 
+  geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
+  
+  labs(title = "IND Climate Problem Distribution in Age Demographics",
+       subtitle = "Adaptation Observatory Survey Responses: 2024 April 15",
+       x = "Age Demographic Groups",
+       y = "Survey Response") +
+  
+  # count of language frequency 
+  geom_text(aes(label = count,
+                fontface = "bold"),
+            size = 3,
+            position = position_dodge(width = 0.9),
+            hjust = -1.5,
+            vjust = 0.4,
+            color = "grey40") +
+  
+  # customs
+  scale_fill_manual(values = colors) +
+  
+  
+  theme_classic()  +
+  
+  theme(
+    plot.title = element_text(size = 15,
+                         hjust = .5),
+    
+    plot.subtitle = element_text(size = 12,
+                            hjust = .5)
+  ) + 
+  
+  coord_flip()
+```
+
+# Trust Government
+```{r fig.width=10, fig.height=5, warning=FALSE, message=FALSE}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ----         BGD           ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Subset data for plotting 
+plot_data_bgd %>%
+  # label groups by age demo
+  mutate(age_group = fct_reorder(age_group, trust_government)) %>%
+  mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+"))) %>%
+  
+  # count frequency 
+  group_by(age_group, gender, trust_government) %>%
+  summarise(count = n()) %>%
+  ungroup() %>% 
+  
+  # create histogram
+  ggplot(aes(fill = gender, y = trust_government, x= age_group)) + 
+  geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
+  
+  labs(title = "BGD Trust Government Distribution in Age Demographics",
+       subtitle = "Adaptation Observatory Survey Responses: 2024 April 15",
+       x = "Age Demographic Groups",
+       y = "Survey Response") +
+  
+  # count of language frequency 
+  geom_text(aes(label = count,
+                fontface = "bold"),
+            size = 3,
+            position = position_dodge(width = 0.9),
+            hjust = -1.5,
+            vjust = 0.4,
+            color = "grey40") +
+  
+  # customs
+  scale_fill_manual(values = colors) +
+  
+  
+  theme_classic()  +
+  
+  theme(
+    plot.title = element_text(size = 15,
+                         hjust = .5),
+    
+    plot.subtitle = element_text(size = 12,
+                            hjust = .5)
+  ) + 
+  
+  coord_flip()
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ----         IND           ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Subset data for plotting 
+plot_data_ind %>%
+  # label groups by age demo
+  mutate(age_group = fct_reorder(age_group, trust_government)) %>%
+  mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+"))) %>%
+  
+  # count frequency 
+  group_by(age_group, gender, trust_government) %>%
+  summarise(count = n()) %>%
+  ungroup() %>% 
+  
+  # create histogram
+  ggplot(aes(fill = gender, y = trust_government, x= age_group)) + 
+  geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
+  
+  labs(title = "IND Trust Government Distribution in Age Demographics",
+       subtitle = "Adaptation Observatory Survey Responses: 2024 April 15",
+       x = "Age Demographic Groups",
+       y = "Survey Response") +
+  
+  # count of language frequency 
+  geom_text(aes(label = count,
+                fontface = "bold"),
+            size = 3,
+            position = position_dodge(width = 0.9),
+            hjust = -1.5,
+            vjust = 0.4,
+            color = "grey40") +
+  
+  # customs
+  scale_fill_manual(values = colors) +
+  
+  
+  theme_classic()  +
+  
+  theme(
+    plot.title = element_text(size = 15,
+                         hjust = .5),
+    
+    plot.subtitle = element_text(size = 12,
+                            hjust = .5)
+  ) + 
+  
+  coord_flip()
+```
+
+
+GROUP BY CELL PHONE NO. or show the responses from the same cell no.
+
+# No Surverys Submitted
+```{r}
+
+```
+

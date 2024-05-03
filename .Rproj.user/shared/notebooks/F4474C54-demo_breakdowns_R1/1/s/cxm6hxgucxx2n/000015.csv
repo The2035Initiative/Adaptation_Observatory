@@ -1,0 +1,12 @@
+"0","generate_dup_plots(ind_duplicates, ""IND"", ""stay_residence"", ""R1"")
+"
+"2","`summarise()` has grouped output by 'ip_address'. You can override using the `.groups` argument."
+"1","[1m[33mError[39m in `mutate()`:[22m
+[38;5;254m[36mℹ[38;5;254m In argument: `age_group = fct_reorder(age_group, .data[[""stay_residence""]])`.[39m
+[1mCaused by error in `lvls_reorder()`:[22m
+[38;5;254m[33m![38;5;254m `idx` must contain one integer for each level of `f`[39m
+Backtrace:
+[90m  1. [39m[1mglobal[22m generate_dup_plots(ind_duplicates, ""IND"", ""stay_residence"", ""R1"")
+[90m 15. [39m[1mforcats[22m::fct_reorder(age_group, .data[[""stay_residence""]])
+[90m 16. [39m[1m[94mforcats::lvls_reorder([39m[22mf, order(summary, decreasing = .desc)[1m[94m)[39m[22m
+"

@@ -1,0 +1,655 @@
+---
+title: "Bangladesh Populations at Risk of Flooding"
+author: 'Sofia Ingersoll'
+format: html
+editor: visual
+---
+
+# Background on Area of Interest
+
+#### Loading libraries
+
+```{r include = FALSE}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----          Install Libraries        ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# incase you haven't installed these packages yet
+# List of required packages
+#packages <- c("sf", "tidyverse", "raster", "tmap", "terra", "stars", "patchwork","here")
+
+# Function to install missing packages
+#install_missing_packages <- function(packages) {
+ # new_packages <- packages[!(packages %in% installed.packages()[,"Package"])]
+  #if (length(new_packages) > 0) {
+   # install.packages(new_packages, dependencies = TRUE)
+  #}
+#}
+```
+
+```{r message = FALSE}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----            Load Libraries         ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+library(sf)
+library(sp)
+library(here)
+library(tmap)
+library(terra)
+library(units)
+library(stars)
+library(stable)
+library(raster)
+library(leaflet)
+library(maptiles)
+library(devtools)
+library(ggspatial)
+library(tmaptools)
+library(patchwork)
+library(yardstick)
+library(sfheaders)
+library(geosphere)
+library(tidyverse)
+library(osmextract)
+library(tidygeocoder)
+library(randomForest)
+library(RColorBrewer)
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----             System Set Up         ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Set working directory 
+knitr::opts_chunk$set(echo = TRUE)
+getwd()
+
+# to ensure observations are reproducible for everyone
+set.seed(123)
+```
+
+## About the Data
+
+### Population Density:
+
+```{r message = FALSE, warning = FALSE, error = FALSE}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----          Load Pop. Den Data       ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# reading in the data
+bgd_pop_den <- read_stars(here("../../data/country_datas/bgd_pd_2020_1km.tif"))
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----        SpatRaster the Data        ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# convert to formal class SpatRaster
+bgd_pop_den_rast <- rast(bgd_pop_den)
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----     Visualize Pop. Den. Data      ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# initial visualization of pop den by quantiles 
+bgd_pd_quantiles <- tm_shape(bgd_pop_den_rast) +
+  tm_raster(style = 'quantile',
+            n = 4,
+            palette = get_brewer_pal("Purples", 
+                                     n=4, 
+                                     plot = FALSE),
+            title = "Bangladesh 2020 Pop. Den Quantiles") +
+  tm_layout(legend.outside = TRUE) 
+bgd_pd_quantiles
+```
+
+### 95th Percentile of Bangladesh Population Density
+
+```{r message = FALSE, warning = FALSE, error = FALSE}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----       Pop. Den Data as sf obj.    ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# creating a mask to filter for areas of high population density
+# vectorizing pop. density to determine the 75th percentile indicator for the population
+bgd_pd_vector <- bgd_pop_den %>% 
+  st_as_sf() %>% 
+  st_make_valid()
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----      Determine 95th Percentile    ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+raster_values <- values(bgd_pop_den_rast)
+q95 <- quantile(raster_values, probs = 0.95,
+                na.rm = TRUE)
+q95
+
+bgd_hpd_rast <- bgd_pop_den_rast >= 1420 
+
+#st_crs(bgd_hpd_rast)
+
+#bgd_hpd_rast[bgd_hpd_rast == FALSE] <- NA
+
+ 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----     Visualize Pop. Den. Data      ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# confirms output is a logical spatraster
+# Visualize the raster data without graticules first
+bgd_95q_plus <- tm_shape(bgd_hpd_rast) +
+  tm_raster(palette = get_brewer_pal("Purples", plot = FALSE),
+            title = "India 2020 Pop. Den") +
+  tm_layout(legend.outside = TRUE)
+
+bgd_95q_plus
+```
+
+### Areas at Risk of Water Exposure
+
+```{r message = FALSE, warning = FALSE, error = FALSE}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----        Load Flood Stacked Data.   ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# load data
+#bgd_floods <- read_stars(here("../data/country_datas/ind_flooding.tif"))
+
+bgd_floods <-read_stars(here('../data/country_datas/ind_flooding5.tif')) 
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----   Visualize Flood Stacked Raster  ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# inital visualization
+plot(bgd_floods)
+
+# this output of I believe is differentiated by resolution
+# need to double check documentation to confirm & also confirm time range on figure
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----        SpatRaster the Data        ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Transform the flood data into a SpatRaster object
+bgd_floods_rast <- rast(bgd_floods)
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----   Visualize Flood Stacked Raster  ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+plot(bgd_floods_rast)
+```
+
+```{r}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----      Pop. Den. Data as sf obj     ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# vectorizing areas of interest (aoi) to determine the 75th percentile of max water exposure
+bgd_flood_vector <- bgd_floods  %>% 
+  st_as_sf() %>% 
+  st_make_valid(bgd_flood_vector) 
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----    Determine 1 km Res 75th Perc.  ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# select 1km resolution from tiff:vector data
+bgd_flood_1km_vector <- bgd_flood_vector %>% dplyr::select(ind_flooding5.tif.V4) 
+
+# here we learn the 75th percentile and see there is no CRS projection
+# units again
+summary(bgd_flood_1km_vector)
+```
+
+## Getting Ready to Combine the Data
+
+Masking unwanted regions (minor flooding) and converting flood data to match the extent, resolution and CRS projection as the pop den data. A visual aid is plotted to check our work, alongside Boolean tests.
+
+```{r}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----   Filter for Flood Prone Regions  ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# creating a mask to filter for areas at risk of experiencing flooding in 75th percentile
+bgd_flood_rast <- bgd_floods_rast >= 86 
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----  Set of Checks & CRS Corrections  ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# boolean test to see if resolutions match
+resolution(bgd_flood_rast) == resolution(bgd_hpd_rast)
+
+ext(bgd_flood_rast) <- ext(bgd_hpd_rast)
+
+ext(bgd_flood_rast) == ext(bgd_hpd_rast)
+
+crs(bgd_flood_rast) <- crs(bgd_hpd_rast)
+
+crs(bgd_flood_rast) == crs(bgd_hpd_rast)
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----   Visualize Flood Stacked Raster  ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# confirms output is a logical spatraster
+plot(bgd_flood_rast)
+```
+
+### Isolating a Specific Layer
+
+#### 1km resolution flooding aoi
+
+```{r warning = FALSE, messge = FALSE, error = FALSE}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----     Visualize 1km Res Flood Map   ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+layer4 <- terra::subset(bgd_flood_rast, 4)
+
+tm_shape(layer4) +
+  tm_raster(palette = get_brewer_pal("Blues", 
+                                     n=4, 
+                                     plot = FALSE),
+            title = "Bangladesh Max Water/Land Exposure") +
+  tm_layout(legend.outside = TRUE) 
+```
+
+#----------------- Skipping past within / intersects attempts
+
+Our rasters are not of the same col length and width - so we're going to try and overlay the rasters using lapp(). let's correct this by resampling and overlaying our data
+
+```{r}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----       Function to Overlay         ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# creating a function to overlay rasters of uneven dimensions
+fun = function(x, y) {
+  x*y
+}
+```
+
+#### Resampling flood data to match pop den
+
+Here, the T/F statement of the floods is overwritten as a numeric
+
+```{r}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----          Resample  w/ KNN         ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#Resample the depth data, use method = "near" to use the nearest neighbor approach
+floods_resample <- resample(layer4, y = bgd_hpd_rast, method = "near")
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----        Set of Optional Checks     ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#Check that the depth data was resampled by stacking the rasters
+pd_floods <- c(bgd_hpd_rast, floods_resample)
+
+#crs(floods_resample)
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----     Visualize Overlayed Rasters   ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Attempting to just plot them over each other
+bgd_map <- tm_shape(floods_resample) +
+  tm_raster(palette = get_brewer_pal('Blues',
+                                     n = 2,
+                                     plot = FALSE),
+            title = "Bangladesh Max Water/Land Exposure") +
+  tm_shape(bgd_hpd_rast) +
+  tm_borders(col = 'black') +
+  tm_raster(alpha = 0.5,
+            style = 'quantile',
+            n = 2,
+            palette = get_brewer_pal("Oranges",
+                                     n = 2,
+                                     plot = FALSE),
+            title = "Pop. Den. 75th Quantile or Higher")
+bgd_map
+```
+
+### Visualizing data
+
+Does this look how we expect it to, comparing the two plots above to the overlayed one below?
+
+It does! Hooray! Now it's time to transform our `aoi` SpatRaster object into an `sf` or `sfc` object! Then, we'll be able to apply our super nifty geo-point formula :-)
+
+```{r}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----    Visualize Regions at Risk      ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Use Lapp to create an overlay of the reclassified data
+aoi <- lapp(c(bgd_hpd_rast, floods_resample), fun = fun) 
+
+aoi_map <- tm_shape(aoi) +
+  tm_raster(n = 2,
+            palette = get_brewer_pal("GnBu"),
+            title = "Bangladesh 75th Pecentile Pop. Den. at Risk of Flooding",
+            colorNA = 'tan') 
+aoi_map
+```
+
+### Extracting Geo-points
+
+We can go about geo-point reduction using geo-spatial analysis tools rather than employing a function. We will be using the sf functions such as `st_join` to extrapolate geo-point locations for areas of high population density at risk of exposure to flooding. We will store these geo-points in a data frame `surveying_points`.
+
+From here, we could resample using the nearest neighbor method or aggregate based upon mean to reduce the number of surveying points in similar areas. We will want a general buffer space separating these geo-points for mitigate for a spillover affect.
+
+These points that present clustered regions at risk are to be used for Facebook surveying.
+
+```{r}
+# breaking down general approach here before diving in:
+# create a df containing only geo-points for values = 1 or TRUE for hpd & flooding risk
+# randomly sample from this collection of geo_points to create a smaller df
+# reverse geo-code these points and attach them to the nearest premiss
+# reduce the number of points by created unionized 1 km city buffers and 5 km rural buffers
+# ensure all geo-points are associated to unique values
+```
+
+#### Subsetting for only regions at risk (ROR)
+
+```{r}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----         isolate ror as sf obj     ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# create a df containing only geo-points for values = 1 or TRUE for hpd & flooding risk
+# convert SpatRaster to sf object, 
+ror <- aoi %>%
+  st_as_stars %>% 
+  st_as_sf() %>% 
+  st_make_valid() 
+
+# filter aoi spatraster to only contain values = 1. This reduced our no. observations to 12636.
+ror <- ror %>% 
+  filter(lyr1 == 1)
+```
+
+#### Randomly down sample ROR for reverse geo-coding
+
+```{r warning=FALSE}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----           ror sf obj to df        ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# k means cluster points
+# convert spatraster to df, we see now 63180 observations
+ror_df <- sf_to_df(ror)
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----      Geodesic Distance Matrix     ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# use the distm function to generate a geodesic distance matrix in meters
+#mdist <- distm(ror_df$x,
+ #              ror_df$y,
+  #             fun = distGeo)
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----       reverse geopoints as sf     ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# garbage clean to aid with next step
+gc()
+# compute kmeans with 100 centroids and try 25 different random starting assignments to optimize clustering assignments
+km_res <- kmeans(ror_df,
+                 100,
+                 nstart = 25)
+# view results in console using print(km_res)
+# centers are the mean of the clusters.
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----         bind clusters to df       ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# aggregate the cluster ids to ror_df to then pull for random sampling
+cluster_df <- cbind(ror_df,
+                    cluster = km_res$cluster)%>% 
+  dplyr::select(cluster, y, x)
+```
+
+```{r}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----       Visualize KNN Clusters      ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# To determine the best number of clusters to create, test is here to visualize the different inputs we can use when making km_res. After some investigation, I found that 100 centroids provides a relatively even distribution of data points.
+test <- cluster_df %>% 
+  st_as_sf(coords = c('x','y'))
+
+ggplot(test) +
+  geom_sf(color = cluster_df$cluster)
+```
+
+```{r}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----        Down Sample to 1000        ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Downsampling to 1000 points and convert to spatial points
+ror_ds <- as_tibble(cluster_df) %>% 
+  sample_n(size = 1000,
+           replace = TRUE) 
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----  reverse geocode for geopoints    ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# reverse geo-coding this chunk will provide us the associated addresses to our geo-points
+# the initial scrapping took 488.6 seconds, so have patience for large data sets
+ror_rgc <- reverse_geo(
+  lat = ror_ds$y,
+  long = ror_ds$x,
+  method = 'arcgis',
+  unique_only = TRUE
+)
+```
+
+### Unionizing Geo-points within 1 km buffers
+
+```{r}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----       reverse geopoints as sf     ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# isolate geo-points for ror
+points <- st_as_sf(ror_rgc,
+                   coords = c('long', 'lat'),
+                   crs = 4326)
+
+plot(points)
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----      1 km buffer for coords       ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# draw 1km buffer areas around points
+areas_1km <- st_buffer(points, 
+                   1000) 
+
+plot(areas_1km)
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----       dissolve geometries         ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# combine overlapping geometries and convert into a single polygon to represent those spaces
+dissolved_areas_1km <- st_cast(st_union(areas_1km),
+                           "POLYGON")
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----       dissolved into sf obj       ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# convert sfc to sf object
+dissolved_areas_1km <-  sf::st_as_sf(dissolved_areas_1km) %>% 
+  rename(geometry = x) 
+
+dissolved_areas_1km <-  st_make_valid(dissolved_areas_1km)
+```
+
+#### Joining Addresses with 1 km Buffered ROR
+
+```{r}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----         geocode into sf obj       ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# create sf object of reverse geo coded points 
+ror_rgc_sf <- as.data.frame(ror_rgc) %>% 
+  st_as_sf(coords = c("long", "lat"),
+           crs = 4326)
+
+# correct invalid geometries
+ror_rgc_sf <- st_make_valid(ror_rgc_sf)
+
+# match crs
+st_crs(dissolved_areas_1km) <- st_crs(ror_rgc_sf)
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----       spatial join approach       ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# join addresses and buffered points
+surveying_1km_sf <- st_join(ror_rgc_sf,
+                        na.omit(dissolved_areas_1km),
+                        left = TRUE)
+
+
+plot(surveying_1km_sf)
+```
+
+### Unionizing Geo-points within 5 km buffers
+
+```{r}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----      5 km buffer for coords       ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# draw 1km buffer areas around points
+areas_5km <- st_buffer(points, 
+                   5000) 
+
+plot(areas_5km)
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----       dissolve geometries         ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# combine overlapping geometries and convert into a single polygon to represent those spaces
+dissolved_areas_5km <- st_cast(st_union(areas_5km),
+                           "POLYGON")
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----       dissolved into sf obj       ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# convert sfc to sf object
+dissolved_areas_5km <-  sf::st_as_sf(dissolved_areas_5km) %>% 
+  rename(geometry = x) 
+
+dissolved_areas_5km <-  st_make_valid(dissolved_areas_5km)
+```
+
+#### Joining Addresses with 5 km Buffered ROR
+
+```{r}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----       spatial join approach       ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# match crs
+st_crs(dissolved_areas_5km) <- st_crs(ror_rgc_sf)
+
+# join addresses and buffered points
+surveying_5km_sf <- st_join(ror_rgc_sf,
+                        na.omit(dissolved_areas_5km),
+                        left = TRUE)
+
+
+plot(surveying_5km_sf)
+```
+
+## Interactive Visual
+
+#### 1 km buffer map
+
+```{r}
+tmap_mode('view')
+
+aoi_1km_buffer_map <- tm_shape(surveying_1km_sf) +
+  tm_basemap(leaflet::providers$Esri.WorldImagery) +
+  tm_bubbles(alpha = 0.2,
+             fill = 'address',
+             col = 'skyblue',
+            title = '1 km Buffered Areas to Survey') +
+  tm_scalebar(position = c('left', 'bottom')) +
+  tm_title("75th Percentile Pop. Den at Risk of Flooding, Bangladesh ")
+
+aoi_1km_buffer_map
+```
+
+#### 5 km buffer map
+
+```{r}
+tmap_mode('view')
+
+aoi_5km_buffer_map <- tm_shape(surveying_5km_sf) +
+  tm_basemap(leaflet::providers$Esri.WorldImagery) +
+  tm_bubbles(alpha = 0.2,
+             fill = 'address',
+             col = 'skyblue',
+            title = '5 km Buffered Areas to Survey') +
+  tm_scalebar(position = c('left', 'bottom')) +
+  tm_title("75th Percentile Pop. Den at Risk of Flooding, Bangladesh ")
+
+aoi_5km_buffer_map
+```
+
+## Incorportating FAO boundaries to create strata for FB ads
+
+```{r}
+# reading in the data
+bgd_adm1 <- st_read(here("../data/country_datas/geoBoundaries-IND-ADM1_simplified.geojson")) %>% 
+  janitor::clean_names() %>% 
+  mutate(adm1_boundary = shape_name)
+
+plot(bgd_adm1)
+
+
+# reading in the data
+bgd_adm2 <- st_read(here("../data/country_datas/geoBoundaries-IND-ADM2_simplified.geojson")) %>% 
+  janitor::clean_names()%>% 
+  mutate(adm2_boundary = shape_name)
+
+plot(bgd_adm2)
+```
+
+Combine and group by geopoints within shapeName \### 1 km buffer zone
+
+```{r}
+# join addresses and buffered points
+bgd_survey_strata_1km <- st_intersection(surveying_1km_sf, bgd_adm1) %>% 
+  dplyr::select(address, adm1_boundary, geometry) %>% 
+  group_by(adm1_boundary) 
+
+bgd_survey_strata_1km <-  st_intersection(bgd_survey_strata_1km, bgd_adm2) %>% 
+  
+  dplyr::select(address, adm1_boundary, adm2_boundary, geometry) %>% 
+  
+  group_by(adm1_boundary) %>% 
+  group_by(adm2_boundary)
+
+bgd_survey_strata_1km
+```
+
+#### 5 km buffer zone
+
+```{r}
+# join addresses and buffered points
+bgd_survey_strata_5km <- st_intersection(surveying_5km_sf, bgd_adm1) %>% 
+  dplyr::select(address, adm1_boundary, geometry) %>% 
+  group_by(adm1_boundary) 
+
+bgd_survey_strata_5km <-  st_intersection(bgd_survey_strata_5km, bgd_adm2) %>% 
+  
+  dplyr::select(address, adm1_boundary, adm2_boundary, geometry) %>% 
+  
+  group_by(adm1_boundary) %>% 
+  group_by(adm2_boundary)
+
+bgd_survey_strata_5km
+```
+
+## Save survey_sf as csv
+
+```{r}
+bgd_survey_points_1km <- st_write(bgd_survey_strata_1km, 
+                                  "ind_survey_strat_points_1km_95th.csv",
+                                  layer_options = "GEOMETRY=AS_XY")
+
+bgd_survey_points_5km <- st_write(bgd_survey_strata_5km,
+                                  "ind_survey_strat_points_5km_95th.csv",
+                                  layer_options = "GEOMETRY=AS_XY")
+```

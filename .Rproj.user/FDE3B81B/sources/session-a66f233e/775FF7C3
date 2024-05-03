@@ -1,0 +1,28 @@
+{
+    "id": "775FF7C3",
+    "path": null,
+    "project_path": null,
+    "type": "object_explorer",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1714764483189.0,
+    "source_on_save": false,
+    "relative_order": 7,
+    "properties": {
+        "id": "d64a62e498da4e4c90cad9ba79c837ca",
+        "name": "result_count_bgd",
+        "title": "result_count_bgd",
+        "language": "R",
+        "source_window_id": "",
+        "Source": "Source"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 0,
+    "encoding": "",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1714764483189,
+    "read_only": false,
+    "read_only_alternatives": []
+}

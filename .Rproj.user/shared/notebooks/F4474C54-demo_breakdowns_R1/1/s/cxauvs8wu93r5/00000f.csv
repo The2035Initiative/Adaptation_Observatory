@@ -1,0 +1,5 @@
+"0","      # Save plot as a png
+      plot_filename <- paste0(folder_path, ""/"", country, ""/"", round_of_surveying, ""/"", ""dup_data_vis"",""/"", ""total_dup_response"",""/"",survey_question, ""/"", country, ""_"", survey_question, ""duplicates_response_analysis_"", round_of_surveying, ""_IP_"", ip, ""_Phone_"", phone, "".png"")
+"
+"2","Error: object 'folder_path' not found
+"

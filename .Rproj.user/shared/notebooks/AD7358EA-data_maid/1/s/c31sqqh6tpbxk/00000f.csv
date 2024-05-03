@@ -1,0 +1,7 @@
+"0","bgd_file <- file.path(here("".."",""data"",""adapt_observ_survey_responses"", ""Observatory_Bangladesh_2024_04_15.csv""))"
+"0","  "
+"0","ind_file <- file.path(here("".."",""data"",""adapt_observ_survey_responses"", ""Observatory_India_2024_04_15.csv""))"
+"0",""
+"0","bgd_responses <- read_csv(bgd_file, show_col_types = FALSE)"
+"0","  "
+"0","ind_responses <-read_csv(ind_file, show_col_types = FALSE)"

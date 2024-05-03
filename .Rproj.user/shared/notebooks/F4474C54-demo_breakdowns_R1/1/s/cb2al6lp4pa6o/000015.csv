@@ -1,0 +1,25 @@
+"0","# data wrangling
+plot_data_bgd_dup <- bgd_dup %>%  
+  mutate(age_group = case_when(
+    (age >= 18 & age < 30) ~ ""18-29"",
+    (age >= 30 & age < 50) ~ ""30-49"",
+    (age >= 50) ~ ""50+""
+   )) %>% 
+  mutate(age = as.integer(age)) %>% 
+  filter(!is.na(age)) %>% 
+  dplyr::select(ip_address, comp_phone1_try1age_group, gender,
+                demo_gender, demo_age, age,
+                q_language, income_brackets, demo_income,
+                household_move, flood_year, stay_residence,
+                flood_close, move_rural_urban, property_loss,
+                housing_damage, flood_prepared, contact_authority,
+                enough_eat, climate_problem, trust_government,
+                no_surverys_submitted, region) 
+"
+"1","[1m[33mError[39m in `dplyr::select()`:[22m
+[33m![39m Can't subset columns that don't exist.
+[31m✖[39m Column `comp_phone1_try1age_group` doesn't exist.
+Backtrace:
+[90m 1. [39m... %>% ...
+[90m 3. [39m[1m[94mdplyr:::select.data.frame([39m[22m...[1m[94m)[39m[22m
+"

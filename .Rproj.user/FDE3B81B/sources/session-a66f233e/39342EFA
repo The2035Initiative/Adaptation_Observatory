@@ -1,0 +1,26 @@
+{
+    "id": "39342EFA",
+    "path": "~/2035/Adaptation_Observatory/response_analysis/Script/demo_breakdowns_R1.qmd",
+    "project_path": "response_analysis/Script/demo_breakdowns_R1.qmd",
+    "type": "quarto_markdown",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1714509222073.0,
+    "source_on_save": false,
+    "relative_order": 6,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "505,5",
+        "scrollLine": "494"
+    },
+    "folds": "523|63|622|0|\n624|63|719|0|\n720|16|817|0|\n819|62|914|0|\n916|62|1010|0|\n1012|62|1106|0|\n1108|62|1202|0|\n1204|62|1298|0|\n1300|62|1393|0|\n1395|63|1492|0|\n1494|62|1588|0|\n1591|62|1685|0|\n1688|63|1783|0|\n1786|63|1881|0|\n",
+    "lastKnownWriteTime": 1714771480,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1714771480990,
+    "read_only": false,
+    "read_only_alternatives": []
+}

@@ -1,0 +1,5 @@
+"0","# group duplicated by phone & ip
+ind_dup <- read_csv(""../clean_data/adaptation_observatory_ind_cleaned_duplicate_survey_questions_R1.csv"",
+                    show_col_types = FALSE) 
+"
+"2","New names:"
