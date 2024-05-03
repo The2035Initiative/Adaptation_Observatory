@@ -37,14 +37,14 @@ library(RColorBrewer)
 
 ```{r}
 # load BGD data 
-bgd <- read_csv("../clean_data/adaptation_observatory_bgd_cleaned_survey_questions_R1.csv",
+bgd <- read_csv(here("response_analysis/potential_panelists/bgd_ideal_survey_panelists.csv"),
                 show_col_types = FALSE)
 bgd_dup <- read_csv("../clean_data/adaptation_observatory_bgd_cleaned_duplicate_survey_questions_R1.csv",
                     show_col_types = FALSE)
 
 
 # load IND data 
-ind <- read_csv("../clean_data/adaptation_observatory_ind_cleaned_survey_questions_R1.csv",
+ind <- read_csv(here("response_analysis/potential_panelists/ind_ideal_survey_panelists.csv"),
                 show_col_types = FALSE)
 ind_dup <- read_csv("../clean_data/adaptation_observatory_ind_cleaned_duplicate_survey_questions_R1.csv",
                     show_col_types = FALSE)
@@ -89,7 +89,7 @@ plot_data_bgd <- bgd %>%
          flood_close, move_rural_urban, property_loss,
          housing_damage, flood_prepared, contact_authority,
          enough_eat, climate_problem, trust_government,
-         no_surverys_submitted) 
+         region, no_surverys_submitted) 
 
 plot_data_bgd
 ```
@@ -111,7 +111,7 @@ plot_data_ind <- ind %>%
          flood_close, move_rural_urban, property_loss,
          housing_damage, flood_prepared, contact_authority,
          enough_eat, climate_problem, trust_government,
-         no_surverys_submitted) 
+         no_surverys_submitted, region) 
 
 plot_data_ind
 ```
@@ -123,7 +123,7 @@ colors <- c("Female" = "#D16014", "Male" = "#17255A")
 ```
 
 
-# Function for plotting survey responses using clean df.
+# Function for plotting survey responses using clean df
 
 ```{r}
 generate_plot <- function(df, country, survey_question, round_of_surveying) {
@@ -140,7 +140,7 @@ generate_plot <- function(df, country, survey_question, round_of_surveying) {
     survey_question_title <- tools::toTitleCase(survey_question)
     survey_question_title <- gsub("_", " ", survey_question_title)
 
-    if ("Yes" %in% df[[survey_question]] | survey_question == "income_brackets") {
+    if ("Yes" %in% df[[survey_question]] | survey_question == "income_brackets" | survey_question == "region") {
       # Subset data for plotting 
       plot_data <- df %>%
         # label groups by age demo
@@ -231,7 +231,7 @@ generate_plot <- function(df, country, survey_question, round_of_surveying) {
 ```
 
 ```{r warning=FALSE, message=FALSE}
-generate_plot(plot_data_ind, "IND", "age", "R1")
+generate_plot(plot_data_bgd, "BGD", "climate_problem", "R1")
 ```
 
 # Lanuage Distribution 
@@ -1602,7 +1602,6 @@ plot_data_ind %>%
   
   coord_flip()
 ```
-
 
 
 GROUP BY CELL PHONE NO. or show the responses from the same cell no.

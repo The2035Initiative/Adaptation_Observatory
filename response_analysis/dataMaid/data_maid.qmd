@@ -212,6 +212,8 @@ ind_data <- ind_responses %>%
   # Correct dtype of lat/long
   mutate(location_longitude = as.numeric(location_longitude),
          location_latitude = as.numeric(location_latitude)) %>%
+  # remove incomplete geolocations
+  filter(complete.cases(location_latitude, location_longitude)) %>%
   ungroup() 
   
 ind_data
@@ -234,7 +236,7 @@ dup_ip_ind <- ind_data %>%
 length(unique(dup_ip_ind$comp_phone1_try1))
 
 
-write.csv(dup_ip_ind, file = "adaptation_observatory_ind_cleaned_duplicate_survey_questions_R1.csv")
+write.csv(dup_ip_ind, file = "../clean_data/adaptation_observatory_ind_cleaned_duplicate_survey_questions_R1.csv")
 ```
 
 # What tax brackets are represented here? `demo_income`
@@ -252,7 +254,7 @@ ind_data <- ind_data %>%
     )
 
 
-write.csv(ind_data, file = "adaptation_observatory_ind_cleaned_survey_questions_R1.csv")
+write.csv(ind_data, file = "../clean_data/adaptation_observatory_ind_cleaned_survey_questions_R1.csv")
 ```
 
 ```{r}
