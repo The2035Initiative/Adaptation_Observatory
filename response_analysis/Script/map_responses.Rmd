@@ -25,15 +25,19 @@ library(RColorBrewer)
 # load BGD data 
 bgd <- read_csv("../clean_data/adaptation_observatory_bgd_cleaned_survey_questions_R1.csv",
                 show_col_types = FALSE)
+# group duplicated by phone & ip
 bgd_dup <- read_csv("../clean_data/adaptation_observatory_bgd_cleaned_duplicate_survey_questions_R1.csv",
-                    show_col_types = FALSE)
+                    show_col_types = FALSE) %>% 
+  group_by(comp_phone1_try1, ip_address)
 
 
 # load IND data 
 ind <- read_csv("../clean_data/adaptation_observatory_ind_cleaned_survey_questions_R1.csv",
                 show_col_types = FALSE)
+# group duplicated by phone & ip
 ind_dup <- read_csv("../clean_data/adaptation_observatory_ind_cleaned_duplicate_survey_questions_R1.csv",
-                    show_col_types = FALSE)
+                    show_col_types = FALSE) %>% 
+  group_by(comp_phone1_try1, ip_address)
 
 # create sf objects
 bgd_sf <- bgd %>% 
@@ -43,6 +47,18 @@ bgd_sf <- bgd %>%
 
 
 ind_sf <- ind %>% 
+  st_as_sf(coords = c("location_longitude", "location_latitude"), crs = "EPSG:4326") %>% 
+  st_make_valid() %>% 
+  filter(!is.na(geometry))
+
+# for duplicates
+bgd_dup_sf <- bgd_dup %>% 
+  st_as_sf(coords = c("location_longitude", "location_latitude"), crs = "EPSG:4326") %>% 
+  st_make_valid() %>% 
+  filter(!is.na(geometry))
+
+# for duplicates
+ind_dup_sf <- ind_dup %>% 
   st_as_sf(coords = c("location_longitude", "location_latitude"), crs = "EPSG:4326") %>% 
   st_make_valid() %>% 
   filter(!is.na(geometry))

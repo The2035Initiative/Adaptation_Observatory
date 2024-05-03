@@ -37,17 +37,19 @@ library(RColorBrewer)
 
 ```{r}
 # load BGD data 
-bgd <- read_csv(here("response_analysis/potential_panelists/bgd_ideal_survey_panelists.csv"),
+bgd <- read_csv("../clean_data/adaptation_observatory_bgd_cleaned_survey_questions_R1.csv",
                 show_col_types = FALSE)
+# group duplicated by phone & ip
 bgd_dup <- read_csv("../clean_data/adaptation_observatory_bgd_cleaned_duplicate_survey_questions_R1.csv",
-                    show_col_types = FALSE)
+                    show_col_types = FALSE) 
 
 
 # load IND data 
-ind <- read_csv(here("response_analysis/potential_panelists/ind_ideal_survey_panelists.csv"),
+ind <- read_csv("../clean_data/adaptation_observatory_ind_cleaned_survey_questions_R1.csv",
                 show_col_types = FALSE)
+# group duplicated by phone & ip
 ind_dup <- read_csv("../clean_data/adaptation_observatory_ind_cleaned_duplicate_survey_questions_R1.csv",
-                    show_col_types = FALSE)
+                    show_col_types = FALSE) 
 ```
 
 
@@ -91,6 +93,24 @@ plot_data_bgd <- bgd %>%
          enough_eat, climate_problem, trust_government,
          region, no_surverys_submitted) 
 
+# data wrangling
+plot_data_bgd_dup <- bgd_dup %>%  
+  mutate(age_group = case_when(
+    (age >= 18 & age < 30) ~ "18-29",
+    (age >= 30 & age < 50) ~ "30-49",
+    (age >= 50) ~ "50+"
+   )) %>% 
+  mutate(age = as.integer(age)) %>% 
+  filter(!is.na(age)) %>% 
+  dplyr::select(ip_address, comp_phone1_try1, age_group,
+                gender, demo_gender, demo_age, age,
+                q_language, income_brackets, demo_income,
+                household_move, flood_year, stay_residence,
+                flood_close, move_rural_urban, property_loss,
+                housing_damage, flood_prepared, contact_authority,
+                enough_eat, climate_problem, trust_government,
+                no_surverys_submitted, region) 
+
 plot_data_bgd
 ```
 
@@ -113,6 +133,26 @@ plot_data_ind <- ind %>%
          enough_eat, climate_problem, trust_government,
          no_surverys_submitted, region) 
 
+
+# data wrangling
+plot_data_ind_dup <- ind_dup %>%  
+  mutate(age_group = case_when(
+    (age >= 18 & age < 30) ~ "18-29",
+    (age >= 30 & age < 50) ~ "30-49",
+    (age >= 50) ~ "50+"
+   )) %>% 
+  mutate(age = as.integer(age)) %>% 
+  filter(!is.na(age)) %>% 
+  dplyr::select(ip_address, comp_phone1_try1, age_group, gender, demo_gender, demo_age, age,
+         q_language, income_brackets, demo_income,
+         household_move, flood_year, stay_residence,
+         flood_close, move_rural_urban, property_loss,
+         housing_damage, flood_prepared, contact_authority,
+         enough_eat, climate_problem, trust_government,
+         no_surverys_submitted, region) 
+
+
+plot_data_ind_dup
 plot_data_ind
 ```
 
@@ -128,7 +168,7 @@ colors <- c("Female" = "#D16014", "Male" = "#17255A")
 ```{r}
 generate_plot <- function(df, country, survey_question, round_of_surveying) {
   # Create folder if it doesn't exist
-  folder_path <- paste0(here("response_analysis","response_visuals",paste0(country, "_response_visuals")))
+  folder_path <- paste0(here("response_analysis","response_visuals"))
   if (!file.exists(folder_path)) {
     dir.create(folder_path)
     print(paste("Folder", folder_path, "created."))
@@ -177,7 +217,7 @@ generate_plot <- function(df, country, survey_question, round_of_surveying) {
         ) 
 
       # Save plot as a png
-      plot_filename <- paste0(folder_path, "/", country, "_", survey_question, "_response_analysis_", round_of_surveying, ".png")
+      plot_filename <- paste0(folder_path, "/", round_of_surveying, "/", country, "_", survey_question, "_response_analysis_", round_of_surveying, ".png")
       ggsave(filename = plot_filename, plot = plot_data, width = 8, height = 5, dpi = 300)
 
       print("Plot saved successfully.")
@@ -219,7 +259,7 @@ generate_plot <- function(df, country, survey_question, round_of_surveying) {
         )
 
       # Save plot as a png
-      plot_filename <- paste0(folder_path, "/", country, "_", survey_question, "_response_analysis_", round_of_surveying, ".png")
+      plot_filename <- paste0(folder_path, "/", country, "/", round_of_surveying, "/", country, "_", survey_question, "_response_analysis_", round_of_surveying, ".png")
       ggsave(filename = plot_filename, plot = plot_data, width = 10, height = 6, dpi = 300)
 
       print("Plot saved successfully.")
@@ -230,10 +270,256 @@ generate_plot <- function(df, country, survey_question, round_of_surveying) {
 }
 ```
 
+
 ```{r warning=FALSE, message=FALSE}
-generate_plot(plot_data_bgd, "BGD", "climate_problem", "R1")
+generate_plot(plot_data_ind, "IND", "climate_problem", "R1")
 ```
 
+
+# Duplicates 
+```{r}
+colnames(plot_data_ind_dup)
+
+# this confirms that all of the respondants here have unique 
+# 45 repeat
+repeat_bgd <- as.numeric(length(unique(bgd_dup$response_id))) - as.numeric(length(unique(bgd_dup$comp_phone1_try1)))
+
+# 6 repeat
+repeat_ind <- as.numeric(length(unique(ind_dup$response_id))) - as.numeric(length(unique(ind_dup$comp_phone1_try1)))
+
+# okay wait, i'm not confident in my approach above bc it's not looking at commonalities between the vectors
+# let's try intersect()
+
+ip_phone_combinations <- function(data) {
+  
+  # Find combinations that appear more than once
+  duplicated_combinations <- data[duplicated(data[, c("ip_address", "comp_phone1_try1")]) |
+                                  duplicated(data[, c("ip_address", "comp_phone1_try1")], fromLast = TRUE), 
+                                  c("ip_address", "comp_phone1_try1")]
+  return(duplicated_combinations)
+}
+
+
+# Example usage:
+# Assuming 'bgd_dup' is your data frame
+repeat_bgd <- ip_phone_combinations(bgd_dup)
+
+
+repeat_ind <- ip_phone_combinations(ind_dup)
+
+
+
+# using join, let's isolate all observations from duplicate phone + ip
+bgd_duplicates <- inner_join(plot_data_bgd_dup, repeat_bgd, by = c("ip_address", "comp_phone1_try1"))
+
+# save file
+write.csv(bgd_duplicates, file = "../clean_data/adaptation_observatory_bgd_cleaned_duplicate_survey_questions_R1.csv")
+
+
+# using join, let's isolate all observations from duplicate phone + ip
+ind_duplicates <- inner_join(plot_data, repeat_ind, by = c("ip_address", "comp_phone1_try1"))
+
+
+# save file
+write.csv(ind_duplicates, file = "../clean_data/adaptation_observatory_ind_cleaned_duplicate_survey_questions_R1.csv")
+```
+
+# Duplicate Iteration Function
+
+## This one to see overall duplicated data responses
+```{r}
+generate_dup_plot <- function(df, country, survey_question, round_of_surveying) {
+  # Create folder if it doesn't exist
+  folder_path <- paste0(here("response_analysis","response_visuals", country, round_of_surveying))
+  if (!file.exists(folder_path)) {
+    dir.create(folder_path)
+    print(paste("Folder", folder_path, "created."))
+  }
+
+  # Save survey question as a title for plotting
+  if (survey_question %in% names(df)) {
+    # Modify survey question title
+    survey_question_title <- tools::toTitleCase(survey_question)
+    survey_question_title <- gsub("_", " ", survey_question_title)
+
+    if ("Yes" %in% df[[survey_question]] | survey_question == "income_brackets" | survey_question == "region") {
+      # Subset data for plotting 
+      plot_data <- df %>%
+        # label groups by age demo
+        mutate(age_group = fct_reorder(age_group, .data[[survey_question]])) %>%
+        mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+"))) %>%
+        # count frequency 
+        group_by(age_group, gender, .data[[survey_question]]) %>%
+        summarise(count = n()) %>%
+        ungroup() %>% 
+        # create histogram
+        ggplot(aes(fill = gender, y = .data[[survey_question]], x= age_group)) + 
+        geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
+        labs(title = paste0(country, " ", survey_question_title, " Distribution in Age Demographics"),
+             subtitle = paste0("Adaptation Observatory Survey Responses: ", round_of_surveying),
+             x = "Age Demographic Groups",
+             y = paste0("Count of ", survey_question_title)) +
+        # count of language frequency 
+        geom_text(aes(label = count,
+                      fontface = "bold"),
+                  size = 3,
+                  position = position_dodge(width = 0.9),
+                  hjust = .5,
+                  vjust = -0.4,
+                  color = "grey40") +
+        # customs
+        scale_fill_manual(values = colors) +
+        theme_classic()  +
+        theme(
+          plot.title = element_text(size = 15,
+                                    hjust = .5),
+          plot.subtitle = element_text(size = 12,
+                                       hjust = .5),
+          axis.title.y = element_text(margin = margin(t = 0, r = 10, b = 0, l = 0)) # Adjust y-axis title position
+        ) 
+
+      # Save plot as a png
+      plot_filename <- paste0(folder_path, "/", "dup_data_vis","/","total_dup_response", "/", country, "_", survey_question, "_duplicates_response_analysis_", round_of_surveying,".png")
+      ggsave(filename = plot_filename, plot = plot_data, width = 8, height = 5, dpi = 300)
+
+      print("Plot saved successfully.")
+    } else {
+      # Subset data for plotting 
+      plot_data <- df %>%
+        # label groups by age demo
+        mutate(age_group = fct_reorder(age_group, .data[[survey_question]])) %>%
+        mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+"))) %>%
+        # count frequency 
+        group_by(age_group, gender, .data[[survey_question]]) %>%
+        summarise(count = n()) %>%
+        ungroup() %>% 
+        # create histogram
+        ggplot(aes(fill = gender, y = .data[[survey_question]], x= age_group)) + 
+        geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
+        labs(title = paste0(country, " ", survey_question_title, " Distribution in Age Demographics"),
+             subtitle = paste0("Adaptation Observatory Survey Responses: ", round_of_surveying),
+             x = "Age Demographic Groups",
+             y = paste0("Count of ",survey_question_title)) +
+        # count of language frequency 
+        geom_text(aes(label = count,
+                      fontface = "bold"),
+                  size = 3,
+                  position = position_dodge(width = 0.9),
+                  hjust = -1.5,
+                  vjust = 0.4,
+                  color = "grey40") +
+        # customs
+        scale_fill_manual(values = colors) +
+        coord_flip() +
+        theme_classic()  +
+        theme(
+          plot.title = element_text(size = 15,
+                                    hjust = .5),
+          plot.subtitle = element_text(size = 12,
+                                       hjust = .5),
+          axis.title.y = element_text(margin = margin(t = 0, r = 10, b = 0, l = 0)) # Adjust y-axis title position
+        )
+
+      # Save plot as a png
+      plot_filename <- paste0(folder_path, "/", "dup_data_vis","/","total_dup_response", "/", country, "_", survey_question, "_duplicates_response_analysis_", round_of_surveying,".png")
+      ggsave(filename = plot_filename, plot = plot_data, width = 10, height = 6, dpi = 300)
+
+      print("Plot saved successfully.")
+    } 
+  } else {
+    print("Specified survey question column does not exist in the dataframe.")
+  }
+}
+```
+
+```{r}
+generate_dup_plot(ind_duplicates, "IND", "q_language", "R1")
+```
+
+## This one to iterate by ip
+```{r}
+generate_dup_plots <- function(df, country, survey_question, round_of_surveying) {
+  # Create folder if it doesn't exist
+  folder_path <- paste0(here("response_analysis","response_visuals"))
+  if (!file.exists(folder_path)) {
+    dir.create(folder_path)
+    print(paste("Folder", folder_path, "created."))
+  }
+  
+  # Save survey question as a title for plotting
+  if (survey_question %in% names(df)) {
+    # Modify survey question title
+    survey_question_title <- tools::toTitleCase(survey_question)
+    survey_question_title <- gsub("_", " ", survey_question_title)
+    
+    # Group by IP address and comp_phone1_try1
+    grouped_df <- df %>%
+      group_by(ip_address, comp_phone1_try1) %>%
+      summarise()
+    
+    # Iterate over each group and generate individual histograms
+    for (i in 1:nrow(grouped_df)) {
+      ip <- grouped_df$ip_address[i]
+      phone <- grouped_df$comp_phone1_try1[i]
+      
+      # Subset data for the current group
+      plot_data <- df %>%
+        filter(ip_address == ip, comp_phone1_try1 == phone) %>%
+        # label groups by age demo
+        mutate(age_group = fct_reorder(age_group, .data[[survey_question]])) %>%
+        mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+", NA))) %>%
+        # count frequency 
+        group_by(age_group, gender, .data[[survey_question]]) %>%
+        summarise(count = n()) %>%
+        ungroup() %>% 
+        # create histogram
+        ggplot(aes(fill = gender, y = .data[[survey_question]], x= age_group)) + 
+        geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
+        labs(title = paste0(country, " ", survey_question_title, " Distribution in Age Demographics"),
+             subtitle = paste0("Adaptation Observatory Survey Responses: ", round_of_surveying),
+             x = "Age Demographic Groups",
+             y = paste0("Count of ", survey_question_title, " (IP:", ip, ", Phone:", phone, ")")) +
+        # count of language frequency 
+        geom_text(aes(label = count,
+                      fontface = "bold"),
+                  size = 3,
+                  position = position_dodge(width = 0.9),
+                  hjust = .5,
+                  vjust = -0.4,
+                  color = "grey40") +
+        # customs
+        scale_fill_manual(values = colors) +
+        theme_classic()  +
+        theme(
+          plot.title = element_text(size = 15,
+                                    hjust = .5),
+          plot.subtitle = element_text(size = 12,
+                                       hjust = .5),
+          axis.title.y = element_text(margin = margin(t = 0, r = 10, b = 0, l = 0)) # Adjust y-axis title position
+        ) 
+      
+      # Save plot as a png
+      plot_filename <- paste0(folder_path, "/", country, "/", round_of_surveying, "/", "dup_data_vis","/", "repeat_ip_cell","/",survey_question, "/", country, "_", survey_question, "duplicates_response_analysis_", round_of_surveying, "_IP_", ip, "_Phone_", phone, ".png")
+      ggsave(filename = plot_filename, plot = plot_data, width = 8, height = 5, dpi = 300)
+      
+      print(paste("Plot for IP:", ip, "and Phone:", phone, "saved successfully."))
+    }
+  } else {
+    print("Specified survey question column does not exist in the dataframe.")
+  }
+}
+```
+
+
+```{r}
+generate_dup_plots(ind_duplicates, "IND", "stay_residence", "R1")
+# not working
+# stay_residence 
+# flood_close 
+# property_loss 
+# housing_damage
+
+```
 # Lanuage Distribution 
 ```{r fig.width=10, fig.height=6, warning=FALSE, message=FALSE}
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -432,7 +718,6 @@ plot_data_ind %>%
     
   ) 
 ```
-
 # Household Move
 ```{r fig.width=8, fig.height=5, warning=FALSE, message=FALSE}
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -628,7 +913,6 @@ plot_data_ind %>%
     
   ) 
 ```
-
 # Stay Residence
 ```{r fig.width=8, fig.height=5, warning=FALSE, message=FALSE}
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -725,7 +1009,6 @@ plot_data_ind %>%
     
   ) 
 ```
-
 # Flood Close
 ```{r fig.width=8, fig.height=5, warning=FALSE, message=FALSE}
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -822,7 +1105,6 @@ plot_data_bgd %>%
     
   ) 
 ```
-
 # Move Rural Urban
 ```{r fig.width=8, fig.height=5, warning=FALSE, message=FALSE}
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -919,7 +1201,6 @@ plot_data_ind %>%
     
   ) 
 ```
-
 # Property Loss
 ```{r fig.width=8, fig.height=5, warning=FALSE, message=FALSE}
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1016,7 +1297,6 @@ plot_data_ind %>%
     
   ) 
 ```
-
 # Housing Damage
 ```{r fig.width=8, fig.height=5, warning=FALSE, message=FALSE}
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1112,7 +1392,6 @@ plot_data_ind %>%
     
   )
 ```
-
 # Flood Prepared
 ```{r fig.width=10, fig.height=5, warning=FALSE, message=FALSE}
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1212,7 +1491,6 @@ plot_data_ind %>%
   ) +
   coord_flip()
 ```
-
 # Contact Authority
 ```{r fig.width=8, fig.height=5, warning=FALSE, message=FALSE}
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
