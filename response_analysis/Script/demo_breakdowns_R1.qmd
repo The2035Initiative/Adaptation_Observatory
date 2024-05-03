@@ -124,111 +124,6 @@ colors <- c("Female" = "#D16014", "Male" = "#17255A")
 
 
 # Function for plotting survey responses using clean df.
-```{r}
-generate_plot <- function(df, country, survey_question, round_of_surveying) {
-  # Create folder if it doesn't exist
-  folder_path <- paste0("..","response_visuals",country, "_response_visuals")
-  if (!file.exists(folder_path)) {
-    dir.create(folder_path)
-    print(paste("Folder", folder_path, "created."))
-  }
-  
-  if (survey_question %in% names(df)) {
-    # Modify survey question title
-    survey_question_title <- tools::toTitleCase(survey_question)
-    survey_question_title <- gsub("_", " ", survey_question_title)
-    
-    if ("Yes" %in% df[[survey_question]]) {
-      # Subset data for plotting 
-      plot_data <- df %>%
-        # label groups by age demo
-        mutate(age_group = fct_reorder(age_group, .data[[survey_question]])) %>%
-        mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+"))) %>%
-        # count frequency 
-        group_by(age_group, gender, .data[[survey_question]]) %>%
-        summarise(count = n()) %>%
-        ungroup() %>% 
-        # create histogram
-        ggplot(aes(fill = gender, y = .data[[survey_question]], x= age_group)) + 
-        geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
-        labs(title = paste0(country, " ", survey_question_title, " Distribution in Age Demographics"),
-             subtitle = paste0("Adaptation Observatory Survey Responses: ", round_of_surveying),
-             x = "Age Demographic Groups",
-             y = paste0("Count of ", survey_question_title)) +
-        # count of language frequency 
-        geom_text(aes(label = count,
-                      fontface = "bold"),
-                  size = 3,
-                  position = position_dodge(width = 0.9),
-                  hjust = .5,
-                  vjust = -0.4,
-                  color = "grey40") +
-        # customs
-        scale_fill_manual(values = colors) +
-        theme_classic()  +
-        theme(
-          plot.title = element_text(size = 15,
-                                    hjust = .5),
-          plot.subtitle = element_text(size = 12,
-                                       hjust = .5),
-          axis.title.y = element_text(margin = margin(t = 0, r = 10, b = 0, l = 0)) # Adjust y-axis title position
-        ) 
-        
-      # Save plot as a png
-      plot_filename <- paste0(folder_path, "/", country, "_", survey_question, "_response_analysis_", round_of_surveying, ".png")
-      ggsave(filename = plot_filename, plot = plot_data, width = 10, height = 6, dpi = 300)
-      
-      print("Plot saved successfully for 'Yes' responses.")
-    } else {
-      # Subset data for plotting 
-      plot_data_bgd <- df %>%
-        # label groups by age demo
-        mutate(age_group = fct_reorder(age_group, .data[[survey_question]])) %>%
-        mutate(age_group = factor(age_group, levels=c("18-29", "30-49", "50+"))) %>%
-        # count frequency 
-        group_by(age_group, gender, .data[[survey_question]]) %>%
-        summarise(count = n()) %>%
-        ungroup() %>% 
-        # create histogram
-        ggplot(aes(fill = gender, y = .data[[survey_question]], x= age_group)) + 
-        geom_col(position="dodge", alpha=0.5, outlier.colour="transparent") +
-        labs(title = paste0(country, " ", survey_question_title, " Distribution in Age Demographics"),
-             subtitle = paste0("Adaptation Observatory Survey Responses: ", round_of_surveying),
-             x = "Age Demographic Groups",
-             y = paste0("Count of ", survey_question_title)) +
-        # count of language frequency 
-        geom_text(aes(label = count,
-                      fontface = "bold"),
-                  size = 3,
-                  position = position_dodge(width = 0.9),
-                  hjust = -1.5,
-                  vjust = 0.4,
-                  color = "grey40") +
-        # customs
-        scale_fill_manual(values = colors) +
-        coord_flip() +
-        theme_classic()  +
-        theme(
-          plot.title = element_text(size = 15,
-                                    hjust = .5),
-          plot.subtitle = element_text(size = 12,
-                                       hjust = .5),
-          axis.title.y = element_text(margin = margin(t = 0, r = 10, b = 0, l = 0)) # Adjust y-axis title position
-        ) +
-        coord_flip()
-        
-      # Save plot as a png
-      plot_filename <- paste0(folder_path, "/", country, "_", survey_question, "_response_analysis_", round_of_surveying, ".png")
-      ggsave(filename = plot_filename, plot = plot_data_bgd, width = 10, height = 6, dpi = 300)
-      
-      print("Plot saved successfully for 'Strongly Agree' responses.")
-    }
-  } else {
-    print("Specified survey question column does not exist in the dataframe.")
-  }
-}
-```
-
 
 ```{r}
 generate_plot <- function(df, country, survey_question, round_of_surveying) {
@@ -336,9 +231,9 @@ generate_plot <- function(df, country, survey_question, round_of_surveying) {
 ```
 
 ```{r warning=FALSE, message=FALSE}
-generate_plot(plot_data_bgd, "BGD", "enough_eat", "R1")
+generate_plot(plot_data_ind, "IND", "age", "R1")
 ```
-#
+
 # Lanuage Distribution 
 ```{r fig.width=10, fig.height=6, warning=FALSE, message=FALSE}
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1709,10 +1604,11 @@ plot_data_ind %>%
 ```
 
 
+
+GROUP BY CELL PHONE NO. or show the responses from the same cell no.
+
 # No Surverys Submitted
 ```{r}
 
 ```
 
-
-GROUP BY CELL PHONE NO. or show the responses from the same cell no.
