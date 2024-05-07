@@ -11,39 +11,43 @@ library(leaflet)
 #library(maptiles)
 #library(devtools)
 #library(ggspatial)
-#library(tmaptools)
+library(tmaptools)
 #library(patchwork)
 #library(sfheaders)
 library(tidyverse)
 #library(osmextract)
 #library(tidygeocoder)
-#library(RColorBrewer)
+library(RColorBrewer)
 ```
 
 
 ```{r message=FALSE, warning=FALSE}
 # load BGD data 
-bgd <- read_csv("../clean_data/adaptation_observatory_bgd_cleaned_survey_questions_R1.csv",
-                show_col_types = FALSE)
+bgd <- read_csv("../results/clean_data/adaptation_observatory_bgd_cleaned_survey_questions_R1.csv",
+                show_col_types = FALSE)  %>% 
+  filter(complete.cases(location_longitude, location_latitude)) 
+  
 # group duplicated by phone & ip
-bgd_dup <- read_csv("../clean_data/adaptation_observatory_bgd_cleaned_duplicate_survey_questions_R1.csv",
+bgd_dup <- read_csv("../results/clean_data/adaptation_observatory_bgd_cleaned_duplicate_survey_questions_R1.csv",
                     show_col_types = FALSE) %>% 
-  group_by(comp_phone1_try1, ip_address)
+  group_by(comp_phone1_try1, ip_address) %>% 
+  filter(complete.cases(location_longitude, location_latitude)) 
 
 
 # load IND data 
-ind <- read_csv("../clean_data/adaptation_observatory_ind_cleaned_survey_questions_R1.csv",
-                show_col_types = FALSE)
+ind <- read_csv("../results/clean_data/adaptation_observatory_ind_cleaned_survey_questions_R1.csv",
+                show_col_types = FALSE) %>% 
+  filter(complete.cases(location_longitude, location_latitude)) 
 # group duplicated by phone & ip
-ind_dup <- read_csv("../clean_data/adaptation_observatory_ind_cleaned_duplicate_survey_questions_R1.csv",
+ind_dup <- read_csv("../results/clean_data/adaptation_observatory_ind_cleaned_duplicate_survey_questions_R1.csv",
                     show_col_types = FALSE) %>% 
-  group_by(comp_phone1_try1, ip_address)
+  group_by(comp_phone1_try1, ip_address)%>% 
+  filter(complete.cases(location_longitude, location_latitude)) 
 
 # create sf objects
 bgd_sf <- bgd %>% 
   st_as_sf(coords = c("location_longitude", "location_latitude"), crs = "EPSG:4326") %>% 
-  st_make_valid() %>% 
-  filter(!is.na(geometry))
+  st_make_valid()
 
 
 ind_sf <- ind %>% 
@@ -186,14 +190,14 @@ max(ind_demos$number_of_surverys_submitted)
 ### Simple Plot with Facebook Targeting
 ```{r}
 # Load in Border Shapefiles
-bgd_borders <- st_read("~/Documents/GitHub/Adaptation_Observatory/geospatial/country_shapefiles/geoBoundaries-BGD-ADM0-all/geoBoundaries-BGD-ADM0_simplified.shp")
+bgd_borders <- st_read(here("geospatial/country_shapefiles/geoBoundaries-BGD-ADM0-all/geoBoundaries-BGD-ADM0_simplified.shp"))
 
-ind_borders <- st_read("~/Documents/GitHub/Adaptation_Observatory/geospatial/country_shapefiles/geoBoundaries-IND-ADM0-all/geoBoundaries-IND-ADM0_simplified.shp")
+ind_borders <- st_read(here("geospatial/country_shapefiles/geoBoundaries-IND-ADM0-all/geoBoundaries-IND-ADM0_simplified.shp"))
 
 # Import Facebook Point Targeting Data
-bgd_fb <- read.csv("~/Documents/GitHub/Adaptation_Observatory/geospatial/surveying_points/bgd_survey_strat_points_1km_95th.csv")
+bgd_fb <- read.csv(here("geospatial/surveying_points/bgd_survey_strat_points_1km_95th.csv"))
 
-ind_fb <- read.csv("~/Documents/GitHub/Adaptation_Observatory/geospatial/surveying_points/ind_survey_strat_points_1km_95th.csv")
+ind_fb <- read.csv(here("geospatial/surveying_points/ind_survey_strat_points_1km_95th.csv"))
 
 bgd_fb_sf <- st_as_sf(bgd_fb, coords = c("X", "Y"), crs = 4326)
 bgd_fb_sf_buffered <- st_buffer(bgd_fb_sf, dist = units::set_units(1000, "m"))
@@ -281,4 +285,238 @@ ind_plt
 ggsave("~/Documents/GitHub/Adaptation_Observatory/response_analysis/results/response_visuals/IND/R1/clean_data_vis/ind_R1_targeting_map.png", plot = ind_plt, width = 10, height = 7, dpi = 300, bg = "white")
 
 ```
+
+# Geospatial Stat. Analysis 
+I want to create an object that only contains the points that overlap respondents browser location and targeted points
+
+I then want that object to compare the number of those observations we collected in the expected regions
+I want to compare the amount of success vs failure 
+
+
+Leveraging the workflow Emma outlined above, I isolated regions where respondents browser location intersected with a 1km buffer around the fb ads that had been deployed.
+
+Comparing the count of respondents within those areas to the count of fb ads that were deployed:
+- BGD success rate was 41.52%
+- IND success rate was 6%
+
+One reasoning behind this discrepancy can be explained by the data limitations caused by the IND flood data. The satellite data provided by Microsoft Planetary Computer for IND was in an angled position. Regardless of the projection, it was extremely difficult getting the boundaries to align. When generating geopoints for IND, there was less confidence in the accuracy of the points being within their expected ADM1 and ADM2 boundaries. 
+
+We deployed a large amount of ads in the NE region of IND, near BGD. Those ads did not receive a lot of feedback response. I'm curious if the ads were competing with the BGD campaign because we received a good amount of BGD income responses that were in Rupees, indicating they may be on the border / do business in IND.
+
+Comparing the regions at risk of flood exposure to the respondents browser location that intersected. No buffers applied here.
+- BGD success rate was
+- IND success rate was
+
+
+Confirming with the flood data, I'm really happy to see that despite the disparity in our ad success for IND, the majority of respondents for IND are located on the coast and in regions at risk to flooding. 
+
+
+-- Other Updates --
+Successfully translated the responses, in the process of deep cleaning the responses. I expect to have that complete by the end of this week and will use that data to generate stacked plots. I will upload those here upon completion. 
+
+```{r ad_response_overlap}
+# BGD 
+# Assuming you have two spatial datasets: respondents' browser locations and targeted points
+# Replace 'respondents' and 'targeted' with your actual datasets
+
+# respondent locations inside of country boundaries
+obs_in_expected_regions_bgd <- st_intersection(bgd_sf_browser_intersect, bgd_fb_sf_buffered)
+
+# expected points 
+bgd_expected_regions <- bgd_fb_sf_buffered
+
+bgd_expected_regions
+
+
+# Step 2: Count observations in expected regions
+success_count <- nrow(obs_in_expected_regions_bgd)
+failure_count <- nrow(bgd_expected_regions) - success_count
+
+# Step 3: Compare success vs. failure
+# Print or use the counts as needed
+print(success_count)
+print(failure_count)
+
+rate_of_success_bgd <- (success_count / nrow(bgd_expected_regions)) * 100
+
+rate_of_success_bgd
+
+
+
+
+
+
+# IND 
+# Assuming you have two spatial datasets: respondents' browser locations and targeted points
+# Replace 'respondents' and 'targeted' with your actual datasets
+
+# respondent locations inside of country boundaries
+obs_in_expected_regions_ind <- st_intersection(ind_sf_browser_intersect, ind_fb_sf_buffered)
+
+# expected points 
+ind_expected_regions <- ind_fb_sf_buffered
+
+#ind_expected_regions
+
+
+# Step 2: Count observations in expected regions
+success_count_ind <- nrow(obs_in_expected_regions_ind)
+failure_count <- nrow(ind_expected_regions) - success_count_ind
+
+# Step 3: Compare success vs. failure
+# Print or use the counts as needed
+print(success_count_ind)
+print(failure_count)
+
+rate_of_success_ind <- (success_count_ind / nrow(ind_expected_regions)) * 100
+
+rate_of_success_ind
+```
+```{r bgd_flood_exposure_response_rate}
+bgd_floods <-read_stars(here('../data/country_datas/bgd_flooding.tif')) 
+
+# Transform the flood data into a SpatRaster object
+bgd_floods_rast <- rast(bgd_floods)
+
+
+# creating a mask to filter for areas at risk of experiencing flooding in 75th percentile
+bgd_flood_rast <- bgd_floods_rast >= 86 
+
+# subset 1km resolution
+layer4 <- terra::subset(bgd_flood_rast, 4)
+
+
+# create sf object for intersection comparision
+bgd_floods_1km <- layer4 %>% 
+  st_as_stars %>%
+  st_as_sf() %>% 
+  st_make_valid()
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----  Set of Checks & CRS Corrections  ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# boolean test to see if resolutions match
+resolution(bgd_floods_1km) == resolution(bgd_sf_browser_intersect)
+
+st_crs(bgd_floods_1km) <- st_crs(bgd_sf_browser_intersect)
+
+st_crs(bgd_floods_1km) == st_crs(bgd_sf_browser_intersect)
+
+
+# Subset bgd_floods_1km where band4 == TRUE
+# these are regions with flood exposure 
+subset_floods <- bgd_floods_1km[bgd_floods_1km$`band4` == TRUE, ] %>% 
+  st_make_valid()
+
+bgd_sf_browser_intersect <- bgd_sf_browser_intersect %>% 
+  st_make_valid()
+
+# Perform intersection to find points in flood prone regions
+obs_in_flood_regions_bgd <- st_intersection(bgd_sf_browser_intersect, subset_floods)
+
+#library(foreach)
+#library(doParallel)
+
+# Set the number of cores to use
+#num_cores <- detectCores()
+
+# Initialize parallel processing
+#cl <- makeCluster(num_cores)
+#registerDoParallel(cl)
+
+
+# Perform intersection in parallel
+#obs_in_flood_regions_bgd <- foreach(i = 1:num_cores, .packages = c("sf")) %dopar% {
+ # st_intersection(bgd_sf_browser_intersect, subset_floods)
+#}
+
+# Combine the results from parallel execution
+#obs_in_flood_regions_bgd <- do.call(rbind, obs_in_flood_regions_bgd)
+
+# Stop parallel processing
+#stopCluster(cl)
+
+
+# Step 2: Count observations in expected regions
+success_flood_count_bgd <- nrow(obs_in_flood_regions_bgd)
+failure_flood_count_bg <- nrow(subset_floods) - success_count_bgd
+
+# Step 3: Compare success vs. failure
+# Print or use the counts as needed
+print(success_flood_count_bgd)
+print(failure_flood+count_bgd)
+
+rate_of_success_floods_bgd <- (success_flood_count_bgd / nrow(subset_floods)) * 100
+
+rate_of_success_floods_bgd
+```
+
+
+```{r ind_flood_exposure_response_rate}
+ind_floods <-read_stars(here('../data/country_datas/bgd_flooding5.tif')) 
+
+
+# Transform the flood data into a SpatRaster object
+ind_floods_rast <- rast(ind_floods)
+
+
+# creating a mask to filter for areas at risk of experiencing flooding in 75th percentile
+ind_flood_rast <- ind_floods_rast >= 86 
+
+# subset 1km resolution
+layer4 <- terra::subset(ind_flood_rast, 4)
+
+ind_floods_sf<- ind_floods  %>% 
+  st_as_stars() %>% 
+  st_as_sf() %>% 
+  st_make_valid() 
+
+
+# select 1km resolution from tiff:vector data
+ind_flood_1km_sf <- ind_floods_sf %>% dplyr::select(ind_flooding5.tif.V4) 
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----  Set of Checks & CRS Corrections  ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# boolean test to see if resolutions match
+resolution(ind_floods_1km_sf) == resolution(ind_sf_browser_intersect)
+
+st_crs(ind_floods_1km_sf) <- st_crs(ind_sf_browser_intersect)
+
+st_crs(ind_floods_1km_sf) == st_crs(ind_sf_browser_intersect)
+
+
+# Subset bgd_floods_1km where band4 == TRUE
+# these are regions with flood exposure 
+subset_floods <- ind_floods_1km[ind_flood_1km$`band4` == TRUE, ] %>% 
+  st_make_valid()
+
+
+# Perform intersection to find points in flood prone regions
+obs_in_flood_regions_ind <- st_intersection(ind_sf_browser_intersect, subset_floods)
+
+
+# Step 2: Count observations in expected regions
+success_count_ind <- nrow(obs_in_flood_regions_ind)
+failure_count <- nrow(subset_floods) - success_count_ind
+
+# Step 3: Compare success vs. failure
+# Print or use the counts as needed
+print(success_flood_count_ind)
+print(failure_flood+count_ind)
+
+rate_of_success_floods_ind <- (success_flood_count_ind / nrow(subset_floods)) * 100
+
+rate_of_success_floods_ind
+
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
 

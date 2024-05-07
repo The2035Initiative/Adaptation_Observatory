@@ -6,34 +6,44 @@ output:
     code_folding: show
     toc: true
     toc_float: true
+editor: 
+  markdown: 
+    wrap: 72
 ---
+
 # Adaptation Observatory Responses
+
 ## India & Bangladesh
+
 ### 2024 April 15
 
-#### Overview & Goals 
-**Create a function to save these histograms for each category as png in a folder to look at later**
-- Visuals of the response distributions from each demo. group
-- Visualizing the difference in the responses from those duplicates
+#### Overview & Goals
 
-- Isolate quality respondents, their locations and the boundary of cell tower locations
+**Create a function to save these histograms for each category as png in
+a folder to look at later** - Visuals of the response distributions from
+each demo. group - Visualizing the difference in the responses from
+those duplicates
 
-- Break down of each topic, then note the ones with the greatest variation
+-   Isolate quality respondents, their locations and the boundary of
+    cell tower locations
 
-- i should create break downs of each demogs, responses as it’s own histogram
+-   Break down of each topic, then note the ones with the greatest
+    variation
 
-- so function to sort by gender and age, then display other things
+-   i should create break downs of each demogs, responses as it’s own
+    histogram
 
-- also have one just for gender age + demo gender age
+-   so function to sort by gender and age, then display other things
+
+-   also have one just for gender age + demo gender age
 
 #### Set up
+
 ```{r}
 library(here)
 library(tidyverse)
 library(RColorBrewer)
 ```
-
-
 
 ```{r}
 # load BGD data 
@@ -52,29 +62,25 @@ ind_dup <- read_csv("../clean_data/adaptation_observatory_ind_cleaned_duplicate_
                     show_col_types = FALSE) 
 ```
 
-
 IDEAS
+
 ```{r}
 colnames(ind)
 ```
 
+GROUP BY AGE & GENDER: DISPLAY COUNT OF ANSWER subset data or select
+group
 
-GROUP BY AGE & GENDER: DISPLAY COUNT OF ANSWER 
-subset data or select group
-
-x = answer
-y = count
+x = answer y = count
 
 GROUPING BY GENDER AND AGE GROUPS
 
-Age groups:
-age >= 18 & age < 30
-age >= 30 & age < 50
-age >= 50 
+Age groups: age \>= 18 & age \< 30 age \>= 30 & age \< 50 age \>= 50
 
 color = gender
 
 #### BGD
+
 ```{r}
 # data wrangling
 plot_data_bgd <- bgd %>%  
@@ -114,7 +120,8 @@ plot_data_bgd_dup <- bgd_dup %>%
 plot_data_bgd
 ```
 
-#### IND 
+#### IND
+
 ```{r}
 # data wrangling
 plot_data_ind <- ind %>%  
@@ -157,11 +164,11 @@ plot_data_ind
 ```
 
 # Set up
+
 ```{r}
 colors <- c("Female" = "#D16014", "Male" = "#17255A")
 #"#C4A287"
 ```
-
 
 # Function for plotting survey responses using clean df
 
@@ -270,13 +277,12 @@ generate_plot <- function(df, country, survey_question, round_of_surveying) {
 }
 ```
 
-
 ```{r warning=FALSE, message=FALSE}
 generate_plot(plot_data_ind, "IND", "climate_problem", "R1")
 ```
 
+# Duplicates
 
-# Duplicates 
 ```{r}
 colnames(plot_data_ind_dup)
 
@@ -327,6 +333,7 @@ write.csv(ind_duplicates, file = "../clean_data/adaptation_observatory_ind_clean
 # Duplicate Iteration Function
 
 ## This one to see overall duplicated data responses
+
 ```{r}
 generate_dup_plot <- function(df, country, survey_question, round_of_surveying) {
   # Create folder if it doesn't exist
@@ -437,6 +444,7 @@ generate_dup_plot(ind_duplicates, "IND", "q_language", "R1")
 ```
 
 ## This one to iterate by ip
+
 ```{r}
 generate_dup_plots <- function(df, country, survey_question, round_of_surveying) {
   # Create folder if it doesn't exist
@@ -510,7 +518,6 @@ generate_dup_plots <- function(df, country, survey_question, round_of_surveying)
 }
 ```
 
-
 ```{r}
 generate_dup_plots(ind_duplicates, "IND", "stay_residence", "R1")
 # not working
@@ -520,7 +527,9 @@ generate_dup_plots(ind_duplicates, "IND", "stay_residence", "R1")
 # housing_damage
 
 ```
-# Lanuage Distribution 
+
+# Lanuage Distribution
+
 ```{r fig.width=10, fig.height=6, warning=FALSE, message=FALSE}
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ----         BGD           ----
@@ -621,7 +630,9 @@ plot_data_ind %>%
   
   coord_flip()
 ```
-# Income Brackets 
+
+# Income Brackets
+
 ```{r fig.width=12, fig.height=5, warning=FALSE, message=FALSE}
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ----         BGD           ----
@@ -718,7 +729,9 @@ plot_data_ind %>%
     
   ) 
 ```
+
 # Household Move
+
 ```{r fig.width=8, fig.height=5, warning=FALSE, message=FALSE}
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ----         BGD           ----
@@ -817,6 +830,7 @@ plot_data_ind %>%
 ```
 
 # Flood Year
+
 ```{r fig.width=8, fig.height=5, warning=FALSE, message=FALSE}
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ----         BGD           ----
@@ -913,7 +927,9 @@ plot_data_ind %>%
     
   ) 
 ```
+
 # Stay Residence
+
 ```{r fig.width=8, fig.height=5, warning=FALSE, message=FALSE}
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ----         BGD           ----
@@ -1009,7 +1025,9 @@ plot_data_ind %>%
     
   ) 
 ```
+
 # Flood Close
+
 ```{r fig.width=8, fig.height=5, warning=FALSE, message=FALSE}
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ----         BGD           ----
@@ -1105,7 +1123,9 @@ plot_data_bgd %>%
     
   ) 
 ```
+
 # Move Rural Urban
+
 ```{r fig.width=8, fig.height=5, warning=FALSE, message=FALSE}
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ----         BGD           ----
@@ -1201,7 +1221,9 @@ plot_data_ind %>%
     
   ) 
 ```
+
 # Property Loss
+
 ```{r fig.width=8, fig.height=5, warning=FALSE, message=FALSE}
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ----         BGD           ----
@@ -1297,7 +1319,9 @@ plot_data_ind %>%
     
   ) 
 ```
+
 # Housing Damage
+
 ```{r fig.width=8, fig.height=5, warning=FALSE, message=FALSE}
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ----         BGD           ----
@@ -1392,7 +1416,9 @@ plot_data_ind %>%
     
   )
 ```
+
 # Flood Prepared
+
 ```{r fig.width=10, fig.height=5, warning=FALSE, message=FALSE}
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ----         BGD           ----
@@ -1491,7 +1517,9 @@ plot_data_ind %>%
   ) +
   coord_flip()
 ```
+
 # Contact Authority
+
 ```{r fig.width=8, fig.height=5, warning=FALSE, message=FALSE}
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ----         BGD           ----
@@ -1589,6 +1617,7 @@ plot_data_ind %>%
 ```
 
 # Enough Eat
+
 ```{r fig.width=8, fig.height=5, warning=FALSE, message=FALSE}
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ----         BGD           ----
@@ -1686,6 +1715,7 @@ plot_data_ind %>%
 ```
 
 # Climate Problem
+
 ```{r fig.width=10, fig.height=5, warning=FALSE, message=FALSE}
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ----         BGD           ----
@@ -1784,6 +1814,7 @@ plot_data_ind %>%
 ```
 
 # Trust Government
+
 ```{r fig.width=10, fig.height=5, warning=FALSE, message=FALSE}
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ----         BGD           ----
@@ -1881,11 +1912,10 @@ plot_data_ind %>%
   coord_flip()
 ```
 
-
 GROUP BY CELL PHONE NO. or show the responses from the same cell no.
 
 # No Surverys Submitted
+
 ```{r}
 
 ```
-

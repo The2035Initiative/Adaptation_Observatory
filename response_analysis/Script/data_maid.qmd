@@ -1,0 +1,668 @@
+---
+author: "Sofia Ingersoll"
+title: "Adaptation Observatory: Survey Response Demographics (Bangladesh & India)"
+date: "2024-04-14"
+output:
+  html_document:
+    code_folding: show
+    toc: true
+    toc_float: true
+---
+
+## Set Up
+```{r set_up,  message = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+
+#..........................load packages.........................
+library(tidyverse)        # load the tidyverse package to assist with data wrangling & cleaning 
+
+library(patchwork)        # load the patchwork package to assist in plot composition (displaying multiple data visualizations) 
+
+library(showtext)         # load the showtext to more easily use fonts
+
+library(googleLanguageR) # translate responses to english
+
+library(here)
+
+#library(leaflet)
+#library(osmextract) 
+#library(units)
+library(sf)
+#library(sfheaders)
+#library(sp)
+#library(raster)
+#library(tmap)
+#library(terra)
+#library(stars)
+#library(ggtext)
+#library(units)
+```
+
+## Load & Wrangle Survey Demographic Data
+```{r loading_data, warning = FALSE}
+bgd_file <- file.path(here("..","data","adapt_observ_survey_responses", "Observatory_Bangladesh_2024_04_15.csv"))
+  
+ind_file <- file.path(here("..","data","adapt_observ_survey_responses", "Observatory_India_2024_04_15.csv"))
+
+bgd_responses <- read_csv(bgd_file, show_col_types = FALSE)
+  
+ind_responses <-read_csv(ind_file, show_col_types = FALSE)
+```
+
+### Filtering only people with cell phone consent and location (gps permission, location_lat/long)
+
+Language: how many dialects
+
+
+#### Make a csv of the questions that were sent out for the first round
+```{r surveying_questions, eval = FALSE}
+survey_questions <- bgd_responses[1, ]
+
+survey_questions
+
+# save as csv
+write.csv(survey_questions, file = "../survey_questions/adaptation_observatory_survey_questions_round_1.csv")
+```
+
+## BGD
+```{r bgd_data_cleaning}
+colnames(bgd_responses)
+
+unique(bgd_responses$consent_cellphone)
+unique(bgd_responses$consent_agreed)
+unique(bgd_responses$consent_age)
+
+# Let's only look at potential panel candidates 
+# bgd reduce to 2262 people
+bgd_data <- bgd_responses %>%
+  janitor::clean_names() %>% 
+  filter(consent_age == "Yes") %>% 
+  filter(consent_agreed == "I agree to participate") %>% 
+  filter(consent_cellphone == "Yes") %>%
+  filter(gps_permission == "Yes") %>% 
+  filter(!is.na(comp_phone1_try1)) %>% 
+  filter(!is.na(comp_phone1_try2)) %>% 
+  # Count the occurrences of each IPAddress
+  group_by(ip_address) %>%
+  mutate(no_surverys_submitted = n()) %>%
+  # Correct dtype of lat/long
+  mutate(geo_lat = as.numeric(geo_lat),
+         geo_lng = as.numeric(geo_lng)) %>%
+  # remove incomplete geolocations
+  filter(complete.cases(geo_lat, geo_lng)) %>%
+  ungroup()
+  
+bgd_data
+
+# this confirms that all of the respondants here have unique 
+length(unique(bgd_data$response_id))
+
+length(unique(dup_ip_bgd$comp_phone1_try1))
+```
+
+
+# What tax brackets are represented here? `demo_income`
+[Policy for personal income tax in Bangladesh](https://bida.gov.bd/details/what-policy-personal-income-tax-bangladesh) was determined using the information provided by the Bangladesh Investment Development Authority (BIDA) Prime Minister’s Office.
+```{r bgd_income_brackets}
+# Define the income thresholds 
+bgd_data <- bgd_data %>% 
+  mutate(income_brackets = case_when(
+    demo_income <= 300000 ~ "0% Tax Rate (Up to BDT 300,000)",
+    demo_income > 300000 & demo_income <= 400000 ~ "5% Tax Rate (BDT 300,001 - 400,000)",
+    demo_income > 400000 & demo_income <= 700000 ~ "10% Tax Rate (BDT 400,001 - 700,000)",
+    demo_income > 700000 & demo_income <= 1100000 ~ "15% Tax Rate (BDT 700,001 - 1,100,000)",
+    demo_income > 1100000 & demo_income <= 1600000 ~ "20% Tax Rate (BDT 1,100,001 - 1,600,000)",
+    demo_income > 1600000 ~ "25% Tax Rate (Above BDT 1,600,000)") 
+    )
+
+
+
+
+# let's further investigate the variance in responses
+dup_ip_bgd <- bgd_data %>% 
+  filter(no_surverys_submitted > 1) %>% 
+  mutate(income_brackets = case_when(
+    demo_income <= 300000 ~ "0% Tax Rate (Up to BDT 300,000)",
+    demo_income > 300000 & demo_income <= 400000 ~ "5% Tax Rate (BDT 300,001 - 400,000)",
+    demo_income > 400000 & demo_income <= 700000 ~ "10% Tax Rate (BDT 400,001 - 700,000)",
+    demo_income > 700000 & demo_income <= 1100000 ~ "15% Tax Rate (BDT 700,001 - 1,100,000)",
+    demo_income > 1100000 & demo_income <= 1600000 ~ "20% Tax Rate (BDT 1,100,001 - 1,600,000)",
+    demo_income > 1600000 ~ "25% Tax Rate (Above BDT 1,600,000)") 
+    )
+```
+
+
+## IND
+```{r ind_data_cleaning}
+# Let's only look at potential panel candidates 
+# ind reduce to 1229 people
+ind_data <- ind_responses %>%
+  janitor::clean_names() %>% 
+  filter(consent_age == "Yes") %>% 
+  filter(consent_agreed == "I agree to participate") %>% 
+  filter(consent_cellphone == "Yes") %>%
+  filter(gps_permission == "Yes") %>% 
+  filter(!is.na(comp_phone1_try1)) %>% 
+  filter(!is.na(comp_phone1_try2)) %>% 
+  # Count the occurrences of each IPAddress
+  group_by(ip_address) %>%
+  mutate(no_surverys_submitted = n()) %>%
+  # Correct dtype of lat/long
+  mutate(geo_lat = as.numeric(geo_lat),
+         geo_lng = as.numeric(geo_lng)) %>%
+  # remove incomplete geolocations
+  filter(complete.cases(geo_lat, geo_lng)) %>%
+  ungroup()
+  
+ind_data
+
+# this confirms that all of the respondants here have unique 
+length(unique(ind_data$response_id))
+
+# let's further investigate the variance in responses
+dup_ip_ind <- ind_data %>% 
+  filter(no_surverys_submitted > 1) %>% 
+  mutate(income_brackets = case_when(
+    demo_income <= 300000 ~ "0% Tax Rate (Up to BDT 300,000)",
+    demo_income > 300000 & demo_income <= 400000 ~ "5% Tax Rate (BDT 300,001 - 400,000)",
+    demo_income > 400000 & demo_income <= 700000 ~ "10% Tax Rate (BDT 400,001 - 700,000)",
+    demo_income > 700000 & demo_income <= 1100000 ~ "15% Tax Rate (BDT 700,001 - 1,100,000)",
+    demo_income > 1100000 & demo_income <= 1600000 ~ "20% Tax Rate (BDT 1,100,001 - 1,600,000)",
+    demo_income > 1600000 ~ "25% Tax Rate (Above BDT 1,600,000)") 
+    )
+
+length(unique(dup_ip_ind$comp_phone1_try1))
+```
+
+# What tax brackets are represented here? `demo_income`
+[Latest Income Tax Slab and Rates - FY 2023-24 | AY 2024-25](https://economictimes.indiatimes.com/wealth/income-tax-slabs?from=mdr) was determined using the information provided by the India Economic Times.
+```{r ind_income_brackets}
+# Define the income thresholds 
+ind_data <- ind_data %>% 
+  mutate(income_brackets = case_when(
+    demo_income <= 300000 ~ "0% Tax Rate (Up to Rs. 3,00,000)",
+    demo_income > 300000 & demo_income <= 600000 ~ "5% Tax Rate (Rs. 3,00,001 - 6,00,000)",
+    demo_income > 600000 & demo_income <= 900000 ~ "10% Tax Rate (Rs. 6,00,001 - 9,00,000)",
+    demo_income > 900000 & demo_income <= 1200000 ~ "15% Tax Rate (Rs. 9,00,001 - 12,00,000)",
+    demo_income > 1200000 & demo_income <= 1500000 ~ "20% Tax Rate (Rs. 12,00,001 - 15,00,000)",
+    demo_income > 1500000 ~ "30% Tax Rate (Above Rs. 15,00,000)") 
+    )
+```
+
+
+
+# Translate Responses to English
+
+for source language, I am using language codes for each dialect/language:
+```
+source_languages <- c("bn", "hi", "gu", "te", "ta", "or", "mr", "ml"), I want to use the q_language column to subset the same language responses together and then translate the associated language using the specific language associated in google_translate()
+```
+
+
+
+```{r}
+# TRUE
+google_is_valid_language_code("en")  
+
+# View the supported languages
+google_supported_languages
+```
+
+### seeing people responded in taka and rupees
+#### CONVERSION RATE 2024/5/6: 1 BGD Taka = 0.76 IND Rupee
+```{r translating}
+library(polyglotr)
+
+# this only caught ages that had the word year next to them
+# numbers not translated
+#create_translation_table(bgd_data$demo_age, "en")
+
+# needs chr alongside number to register
+# seeing people responded in taka and rupees
+# CONVERSION RATE 2024/5/6 1 BGD Taka = 0.76 IND Rupee
+#create_translation_table(bgd_data$demo_income, "en")
+
+
+
+# Translate demo_age column
+# need to filter ages between 18:130 to be extra safe
+# include year* in clause
+# replace "twenty three", 23
+# remove the survey entry for 3 p.
+# The letter "p" might stand for "বছর" (bochor), which means "years" in Bengali. 
+# So, "3 p" would translate to "3 years" old. and this IP+Cell submitted 2 surveys
+# indicating it's likely a parent filling out their opinions+info on behalf of their child
+# in this survey, we chose to only include individuals over the age of 18
+bgd_data$demo_age_english <- sapply(bgd_data$demo_age, translate_to_english_google, source_language = "bn")
+
+# Translate demo_income column
+# replace 00, 000,	00000, "Currently unemployed", "I did not earn any income", "Nil", "no", "No", "Nothing", "nothing",  "I didn't get celery", "ay korini", "	Don't do it", "	I'm jobless" as 0
+# replace the word " thousand *" with 000
+# group the i am a student into student*", "Student*"
+# replace the word thousand with 000
+# convert ₹ rupees to taka 
+# replace "Roughly*" with NA
+# "very bad condition", "Expenditure is more than income", ""
+# remove "BDT", "TK", "tk", "taka" ",/", ".00"," /=", "/-", ",","৳", "/", "-|", "/- ৳"
+# 20k, 20000
+# replace "the minimum",  as "NA"
+# replace "3-4 thousand probably."  as 3500
+# 50 thousand rupees convert to BDT: 2024/5/6 1 Rs. = 1.32 BDT
+# replace 10 mase 50hajar (10 months 50 thousand) with 50k X 10 = 50,000= 500000
+# convert "4500 rupees only" to BDT currency 
+# convert 25000/Rs. to BDT currrency
+# replace "-" with NA 
+# replace	eighteen thousand, 18000
+# convert 10$ to BDT 2024/5/6 1 USD = 109.75 BDT
+# replace Eight thousand, 8000
+# replace 30 thousand plus, 30000
+# convert	15000 rupees to BDT
+# replace "More than 25 thousand.", 25000
+# convert	50000 rupees to BDT
+# convert 75,000 rupees to BDT
+# Replace	"About 15 thousand", 15000
+# convert 12000 thousand rupees to BDT
+# convert 10000 rupees to BDT
+# convert 1500/= Rs to BDT
+# replace "	Monthly pensioner 24 thousand taka", 288000
+# replace "Fifty thousand", 50000
+# replace " lac*" with 000
+# replace "I work in agriculture" as NA 
+bgd_data$demo_income_english <- sapply(bgd_data$demo_income, translate_to_english_google, source_language = "bn")
+
+
+# View translated data
+print(bgd_data)
+
+
+
+source_languages <- c("bn", "hi", "gu", "te", "ta", "or", "mr", "ml")
+
+# Translate demo_age column
+# need to filter ages between 18:130 to be extra safe
+# include year* and Year* in clause
+# convert
+# Sixty four 
+# 73yrs old to 73
+# remove "completed*", 
+# 919725033808 this was input for someones age and income 
+# 76109 input as age and 1000 was their income
+ind_data$demo_age_english <- sapply(ind_data$demo_age, translate_to_english_google, source_language = "bn")
+
+ind_data$demo_age_english <- sapply(ind_data$demo_age, translate_to_english_google, source_language = "hi")
+
+ind_data$demo_age_english <- sapply(ind_data$demo_age, translate_to_english_google, source_language = "gu")
+
+ind_data$demo_age_english <- sapply(ind_data$demo_age, translate_to_english_google, source_language = "te")
+
+ind_data$demo_age_english <- sapply(ind_data$demo_age, translate_to_english_google, source_language = "ta")
+
+ind_data$demo_age_english <- sapply(ind_data$demo_age, translate_to_english_google, source_language = "or")
+
+ind_data$demo_age_english <- sapply(ind_data$demo_age, translate_to_english_google, source_language = "mr")
+
+ind_data$demo_age_english <- sapply(ind_data$demo_age, translate_to_english_google, source_language = "ml")
+
+# Translate demo_income column
+# group together all 00, 000, "Nothing", "Retired so none", "Nil", "No","no", "Not working past 1 yr", "00/-₹", "Xxx", "No fixed income source depe*" as 0
+# group the i am a student into "Student"
+# replace the word " thousand" with 000
+# remove ".00","Rs.",","/-",", ", " , still a student", "Rs"# directly attached to number
+# replace"N/A", "NA", "don't know" as NA 
+# noting a 0.36, could i round down to 0?
+# "4 to 5 approx" ? 
+# Approx ten thousand., 10000
+# 2k, 2000
+# 50k, 50000
+# EIGHTEEN THOUSAND, 18000
+# One, 1
+# " $", " USD approximately",-- need to convert all of these to the appropriate currency for tax brackets
+# replace 1 lac with 100,000 -- this is 
+ind_data$demo_income_english <- sapply(ind_data$demo_income, translate_to_english_google, source_language = "bn")
+
+ind_data$demo_income_english <- sapply(ind_data$demo_income, translate_to_english_google, source_language = "hi")
+
+ind_data$demo_income_english <- sapply(ind_data$demo_income, translate_to_english_google, source_language = "gu")
+
+ind_data$demo_income_english <- sapply(ind_data$demo_income, translate_to_english_google, source_language = "te")
+
+ind_data$demo_income_english <- sapply(ind_data$demo_income, translate_to_english_google, source_language = "ta")
+
+ind_data$demo_income_english <- sapply(ind_data$demo_income, translate_to_english_google, source_language = "or")
+
+ind_data$demo_income_english <- sapply(ind_data$demo_income, translate_to_english_google, source_language = "mr")
+
+ind_data$demo_income_english <- sapply(ind_data$demo_income, translate_to_english_google, source_language = "ml")
+
+# View translated data
+print(ind_data)
+```
+
+For quality assurance sake, let's create some checks on our responses
+- demo_age_english == [18:130], Replace invalid responses > 130 with NA, if # < 18, remove from the survey data frame.
+
+- demo_income_english contains c("$","USD*") convert income to match the currency used for tax brackets: BGD: Taka, IND: Rupees
+- demo_income_english forced integers, getting rid of decimals and replacing all str with numeric values, 0 is only accepted 0 value
+- Group together students, retired, unemployed into separate categories: would be cool to have these as drop down options in qtric.
+
+
+Fun facts:
+In the Indian numbering system, a "lac" (also spelled "lakh") refers to one hundred thousand (100,000). It is a term commonly used in South Asia, particularly in India, Pakistan, Bangladesh, and Nepal, to denote large numbers in the order of hundreds of thousands.
+
+
+
+
+
+```{r data_deep_cleaning}
+
+```
+
+```{r}
+
+
+```
+
+
+
+
+# Save Clean Data for Later
+```{r}
+# BGD
+write.csv(dup_ip_bgd, file = "../results/clean_data/adaptation_observatory_bgd_cleaned_duplicate_survey_questions_R1.csv")
+
+
+write.csv(bgd_data, file = "../results/clean_data/adaptation_observatory_bgd_cleaned_survey_questions_R1.csv")
+
+
+# IND
+write.csv(dup_ip_bgd, file = "../results/clean_data/adaptation_observatory_ind_cleaned_duplicate_survey_questions_R1.csv")
+
+
+write.csv(bgd_data, file = "../results/clean_data/adaptation_observatory_ind_cleaned_survey_questions_R1.csv")
+```
+
+
+####  Make a csv of all the responser ids
+```{r}
+# BGD
+bgd_respondents <- bgd_data[,"response_id"]
+
+# Create a folder named "survey_response_ids" if it doesn't exist
+dir.create("survey_response_ids", showWarnings = FALSE)
+
+# Set the file path including the folder
+file_path <- file.path("..","results","survey_response_ids", "bgd_survey_response_ids.csv")
+
+# save it as a csv
+write_csv(bgd_respondents, file = file_path)
+
+# IND
+ind_respondents <- ind_data[,"response_id"]
+
+# Create a folder named "survey_response_ids" if it doesn't exist
+dir.create("survey_response_ids", showWarnings = FALSE)
+
+# Set the file path including the folder
+file_path <- file.path("..","results","survey_response_ids", "ind_survey_response_ids.csv")
+
+# save it as a csv
+write_csv(ind_respondents, file = file_path)
+```
+
+
+# Data Maid BGD
+
+
+histogram of basic distribution of demographics
+people who give location vs done: how are they different
+how are the location and ip_address & phone numbers same or different
+do this for duplicate subset
+
+
+curious about 
+distribution of languages people took the survey in (11 regional languages, qualtrix recorded the type as a metric)
+
+We expect people falling within validated bufffers to report seeing a flood more often or experience a negative experience more often than those outside of our AOI.
+
+Considerations moving forward
+- who's inside and outside AOI || DROP 
+- who among the respondents are most likely to contribute to the panel moving forward
+
+
+#### Comparing differences between geo_lat, geo_lon vs location_lat, location_lon
+
+
+```{r}
+suppressPackageStartupMessages(library(dataMaid))
+
+bgd <- bgd_data %>% 
+  # remove first two rows
+  slice(-c(1, 2)) 
+
+makeDataReport(bgd,
+               output = "html",
+               replace = TRUE,
+               reportTitle = "Bangladesh Adaptation Observation Survey Responses, Retrieval Date 15 April 2024.")
+
+makeDataReport(dup_ip_bgd,
+               output = "html",
+               replace = TRUE,
+               reportTitle = "Bangladesh Adaptation Observation Duplicate IP Address Survey Responses, Retrieval Date 15 April 2024.")
+```
+
+
+```{r}
+ind <-ind_data %>% 
+  # remove first two rows
+  slice(-c(1, 2)) 
+
+makeDataReport(ind,
+               output = "html",
+               replace = TRUE,
+               reportTitle = "India Adaptation Observation Survey Responses, Retrieval Date 15 April 2024.")
+
+makeDataReport(dup_ip_ind,
+               output = "html",
+               replace = TRUE,
+               reportTitle = "India Adaptation Observation Duplicate IP Address Survey Responses, Retrieval Date 15 April 2024.")
+```
+
+####  Make a csv of all the responser ids
+```{r}
+ind_respondents <- ind_data[,"response_id"]
+
+# Create a folder named "survey_response_ids" if it doesn't exist
+dir.create("survey_response_ids", showWarnings = FALSE)
+
+# Set the file path including the folder
+file_path <- file.path("survey_response_ids", "ind_survey_response_ids.csv")
+
+# save it as a csv
+write_csv(ind_respondents, file = file_path)
+```
+
+# How many of these participants are within the shape file we originally used to generate geo-points?
+
+validate & quanitfy % accuracy
+from that sample: assess group representation benchmarks
+(gender, income, age) start with this for now
+
+Explicit test of wht fraction of locations are located within the spatial polygon we were sampling
+
+within 5-10km buffer potentially as a result of cell-towers
+
+How affective have we been finding indiividuals we hoped to find in these areas
+
+
+distribution of languages people took the survey in (11 regional languages, qualtric recorded the type as a metric)
+
+We expect people falling within validated bufffers to report seeing a flood more often or experience a negative experience more often than those outside of our AOI.
+
+Considerations moving forward
+- who's inside and outside AOI || DROP 
+- who among the respondents are most likely to contribute to the panel moving forward
+
+
+```{r bgd_sf_object}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----          Load Pop. Den Data       ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# reading in the data
+bgd_pop_den <- read_stars(here("../data/country_datas/bgd_pd_2020_1km.tif"))
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----        SpatRaster the Data        ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# convert to formal class SpatRaster
+bgd_pop_den_rast <- rast(bgd_pop_den)
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----      Determine 95th Percentile    ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+raster_values <- values(bgd_pop_den_rast)
+q95 <- quantile(raster_values, probs = 0.95,
+                na.rm = TRUE)
+
+bgd_hpd_rast <- bgd_pop_den_rast >= q95
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----        Load Flood Stacked Data.   ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# load data
+#bgd_floods <- read_stars(here("../data/country_datas/ind_flooding.tif"))
+
+bgd_floods <-read_stars(here('../data/country_datas/ind_flooding5.tif')) 
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----        SpatRaster the Data        ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Transform the flood data into a SpatRaster object
+bgd_floods_rast <- rast(bgd_floods)
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----   Filter for Flood Prone Regions  ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# creating a mask to filter for areas at risk of experiencing flooding in 75th percentile
+
+q75 <- quantile(bgd_floods_rast, probs = 0.75,
+                na.rm = TRUE)
+bgd_flood_rast <- bgd_floods_rast >= q75 
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----  Set of Checks & CRS Corrections  ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# boolean test to see if resolutions match
+ext(bgd_flood_rast) <- ext(bgd_hpd_rast)
+crs(bgd_flood_rast) <- crs(bgd_hpd_rast)
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----     Visualize 1km Res Flood Map   ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+layer4 <- terra::subset(bgd_flood_rast, 4)
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----       Function to Overlay         ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# creating a function to overlay rasters of uneven dimensions
+fun = function(x, y) {
+  x*y
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----          Resample  w/ KNN         ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#Resample the depth data, use method = "near" to use the nearest neighbor approach
+floods_resample <- resample(layer4, y = bgd_hpd_rast, method = "near")
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----        Set of Optional Checks     ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#Check that the depth data was resampled by stacking the rasters
+pd_floods <- c(bgd_hpd_rast, floods_resample)
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----    Visualize Regions at Risk      ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Use Lapp to create an overlay of the reclassified data
+aoi <- lapp(c(bgd_hpd_rast, floods_resample), fun = fun) 
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----         isolate ror as sf obj     ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# create a df containing only geo-points for values = 1 or TRUE for hpd & flooding risk
+# convert SpatRaster to sf object, 
+ror <- aoi %>%
+  st_as_stars %>% 
+  st_as_sf() %>% 
+  st_make_valid() 
+
+# filter aoi spatraster to only contain values = 1. This reduced our no. observations to 12636.
+ror <- ror %>% 
+  filter(lyr1 == 1)
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----  FAO boundaries to create strata  ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# reading in the data
+bgd_adm1 <- st_read(here("../data/country_datas/geoBoundaries-IND-ADM1_simplified.geojson")) %>% 
+  janitor::clean_names() %>% 
+  mutate(adm1_boundary = shape_name)
+
+
+bgd_adm2 <- st_read(here("../data/country_datas/geoBoundaries-IND-ADM2_simplified.geojson")) %>% 
+  janitor::clean_names()%>% 
+  mutate(adm2_boundary = shape_name)
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#----    include providence boundaries  ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# join addresses and buffered points
+bgd_aoi <- st_intersection(ror, bgd_adm1) %>% 
+  dplyr::select(adm1_boundary, geometry) %>% 
+  group_by(adm1_boundary) 
+
+bgd_aoi <-  st_intersection(bgd_aoi, bgd_adm2) %>% 
+  
+  dplyr::select(adm1_boundary, adm2_boundary, geometry) %>% 
+  
+  group_by(adm1_boundary) %>% 
+  group_by(adm2_boundary)
+```
+
+This join isn't perfect yet, it doesn't preserve the data I want to add to the plot. I need to give this more time.
+
+```{r bgd_gis_check}
+bgd_demo_sf <- bgd %>% 
+  
+  st_as_sf(coords = c("location_longitude", "location_latitude"), crs = 4326)
+
+
+bgd_aoi <- st_join(bgd_aoi,
+                   bgd_demo_sf,
+                   #.pred = st_within
+                   )
+bgd_aoi
+
+tmap_mode('view')
+
+bgd_response_map <- tm_shape(bgd_aoi) +
+  tm_basemap(leaflet::providers$Esri.WorldImagery) +
+  tm_polygons(adm1_boundary,
+              palette = 'Purples',
+              fill = "grey80",
+              alpha = 2) +
+  tm_bubbles(alpha = 0.2,
+             fill = 'ip_address',
+             col = 'skyblue',) +
+  tm_scalebar(position = c('left', 'bottom')) +
+  tm_title("Adaptation Observatory Responses, Bangladesh (2024-4-15)")
+
+
+bgd_response_map
+```
+
+**Color mapping // Opinion Mapping**
