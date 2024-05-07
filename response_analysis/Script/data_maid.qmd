@@ -267,7 +267,7 @@ bgd_data$demo_age_english <- sapply(bgd_data$demo_age, translate_to_english_goog
 # replace "	Monthly pensioner 24 thousand taka", 288000
 # replace "Fifty thousand", 50000
 # replace " lac*" with 000
-# replace "I work in agriculture" as NA 
+# replace "I work in agriculture" as NA
 bgd_data$demo_income_english <- sapply(bgd_data$demo_income, translate_to_english_google, source_language = "bn")
 
 

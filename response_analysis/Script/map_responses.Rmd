@@ -39,10 +39,10 @@ ind <- read_csv("../results/clean_data/adaptation_observatory_ind_cleaned_survey
                 show_col_types = FALSE) %>% 
   filter(complete.cases(location_longitude, location_latitude)) 
 # group duplicated by phone & ip
-ind_dup <- read_csv("../results/clean_data/adaptation_observatory_ind_cleaned_duplicate_survey_questions_R1.csv",
-                    show_col_types = FALSE) %>% 
-  group_by(comp_phone1_try1, ip_address)%>% 
-  filter(complete.cases(location_longitude, location_latitude)) 
+#ind_dup <- read_csv("../results/clean_data/adaptation_observatory_ind_cleaned_duplicate_survey_questions_R1.csv",
+  #                  show_col_types = FALSE) %>% 
+ # group_by(comp_phone1_try1, ip_address)%>% 
+#  filter(complete.cases(location_longitude, location_latitude)) 
 
 # create sf objects
 bgd_sf <- bgd %>% 
@@ -303,16 +303,18 @@ One reasoning behind this discrepancy can be explained by the data limitations c
 
 We deployed a large amount of ads in the NE region of IND, near BGD. Those ads did not receive a lot of feedback response. I'm curious if the ads were competing with the BGD campaign because we received a good amount of BGD income responses that were in Rupees, indicating they may be on the border / do business in IND.
 
-Comparing the regions at risk of flood exposure to the respondents browser location that intersected. No buffers applied here.
-- BGD success rate was
-- IND success rate was
+Currently working on comparing the regions at risk of flood exposure to the respondents browser location that intersected, with no buffers applied. This will confirm with the flood data that despite the disparity in our ad success for IND, the majority of respondents for IND are located on the coast and in regions at risk to flooding.
 
-
-Confirming with the flood data, I'm really happy to see that despite the disparity in our ad success for IND, the majority of respondents for IND are located on the coast and in regions at risk to flooding. 
-
+The intersection process is taking a really long time to complete and I haven't been able to get it to work properly yet. Once that is running right, I will provide the sucess rates for targetting regions at risk of flood exposure. 
 
 -- Other Updates --
 Successfully translated the responses, in the process of deep cleaning the responses. I expect to have that complete by the end of this week and will use that data to generate stacked plots. I will upload those here upon completion. 
+
+
+-- Next time 
+Confirming with the flood data, I'm really happy to see that despite the disparity in our ad success for IND, the majority of respondents for IND are located on the coast and in regions at risk to flooding.
+- BGD success rate was
+- IND success rate was
 
 ```{r ad_response_overlap}
 # BGD 
@@ -396,11 +398,11 @@ bgd_floods_1km <- layer4 %>%
 #----  Set of Checks & CRS Corrections  ----
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # boolean test to see if resolutions match
-resolution(bgd_floods_1km) == resolution(bgd_sf_browser_intersect)
+#resolution(bgd_floods_1km) == resolution(bgd_sf_browser_intersect)
 
 st_crs(bgd_floods_1km) <- st_crs(bgd_sf_browser_intersect)
 
-st_crs(bgd_floods_1km) == st_crs(bgd_sf_browser_intersect)
+#st_crs(bgd_floods_1km) == st_crs(bgd_sf_browser_intersect)
 
 
 # Subset bgd_floods_1km where band4 == TRUE
@@ -408,11 +410,16 @@ st_crs(bgd_floods_1km) == st_crs(bgd_sf_browser_intersect)
 subset_floods <- bgd_floods_1km[bgd_floods_1km$`band4` == TRUE, ] %>% 
   st_make_valid()
 
+# Simplify geometries
+floods_simplified <- st_simplify(subset_floods) %>% 
+  st_make_valid()
+
+
 bgd_sf_browser_intersect <- bgd_sf_browser_intersect %>% 
   st_make_valid()
 
 # Perform intersection to find points in flood prone regions
-obs_in_flood_regions_bgd <- st_intersection(bgd_sf_browser_intersect, subset_floods)
+obs_in_flood_regions_bgd <- st_intersection(bgd_sf_browser_intersect, floods_simplified)
 
 #library(foreach)
 #library(doParallel)
