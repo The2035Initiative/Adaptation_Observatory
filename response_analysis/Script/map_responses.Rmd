@@ -27,23 +27,29 @@ bgd <- read_csv("../results/clean_data/adaptation_observatory_bgd_cleaned_survey
                 show_col_types = FALSE)  %>% 
   filter(complete.cases(location_longitude, location_latitude)) 
   
-# group duplicated by phone & ip
-bgd_dup <- read_csv("../results/clean_data/adaptation_observatory_bgd_cleaned_duplicate_survey_questions_R1.csv",
-                    show_col_types = FALSE) %>% 
-  group_by(comp_phone1_try1, ip_address) %>% 
-  filter(complete.cases(location_longitude, location_latitude)) 
 
 
 # load IND data 
 ind <- read_csv("../results/clean_data/adaptation_observatory_ind_cleaned_survey_questions_R1.csv",
                 show_col_types = FALSE) %>% 
   filter(complete.cases(location_longitude, location_latitude)) 
+
+
+# ---- duplicates ----
+# group duplicated by phone & ip
+bgd_dup <- read_csv("../results/clean_data/adaptation_observatory_bgd_cleaned_duplicate_survey_questions_R1.csv",
+                    show_col_types = FALSE) %>% 
+  group_by(comp_phone1_try1, ip_address) %>% 
+  filter(complete.cases(location_longitude, location_latitude)) 
+
 # group duplicated by phone & ip
 #ind_dup <- read_csv("../results/clean_data/adaptation_observatory_ind_cleaned_duplicate_survey_questions_R1.csv",
   #                  show_col_types = FALSE) %>% 
  # group_by(comp_phone1_try1, ip_address)%>% 
 #  filter(complete.cases(location_longitude, location_latitude)) 
 
+
+# ---- sf objects qualtrics location ----
 # create sf objects
 bgd_sf <- bgd %>% 
   st_as_sf(coords = c("location_longitude", "location_latitude"), crs = "EPSG:4326") %>% 
@@ -55,7 +61,7 @@ ind_sf <- ind %>%
   st_make_valid() %>% 
   filter(!is.na(geometry))
 
-
+# ---  sf objects browser location ----
 bgd_sf_browser <- bgd %>% 
   filter(!is.na(geo_lng) & !is.na(geo_lat)) %>%
   st_as_sf(coords = c("geo_lng", "geo_lat"), crs = "EPSG:4326") %>% 
@@ -67,6 +73,7 @@ ind_sf_browser <- ind %>%
   st_as_sf(coords = c("geo_lng", "geo_lat"), crs = "EPSG:4326") %>% 
   st_make_valid()
 
+# ----sf objects qualtrics location duplicate ----
 # for duplicates
 bgd_dup_sf <- bgd_dup %>% 
   st_as_sf(coords = c("location_longitude", "location_latitude"), crs = "EPSG:4326") %>% 
@@ -94,7 +101,6 @@ ind_shp <- read_stars(here("../data/country_datas/ind_pd_2020_1km.tif")) %>%
   st_as_sf(crs = "EPSG:4326") %>% 
   st_make_valid()
 ```
-
 
 # Join
 
@@ -213,7 +219,7 @@ bgd_sf_browser_intersect <- st_intersection(bgd_sf_browser, bgd_borders)
 ind_sf_intersect <- st_intersection(ind_sf, ind_borders)
 ind_sf_browser_intersect <- st_intersection(ind_sf_browser, ind_borders)
 
-
+# ---- bgd plot ----
 bgd_plt <- ggplot() +
   geom_sf(data = bgd_sf_browser_intersect, aes(fill = "Respondents Browser Location", shape = "Respondents Browser Location"), color = "blue", size = 0.25, alpha = 0.5) + 
   geom_sf(data = bgd_sf_intersect, aes(fill = "Respondents Qualtrics Location", shape = "Respondents Qualtrics Location"), color = "skyblue", size = 0.25, alpha = 0.2) + 
@@ -248,7 +254,7 @@ bgd_plt <- ggplot() +
 bgd_plt
 
 ggsave("~/Documents/GitHub/Adaptation_Observatory/response_analysis/results/response_visuals/BGD/R1/clean_data_vis/bgd_R1_targeting_map.png", plot = bgd_plt, width = 10, height = 7, dpi = 300, bg = "white")
-
+# ---- ind plot ----
 ind_plt <- ggplot() +
   geom_sf(data = ind_sf_browser_intersect, aes(fill = "Respondents Browser Location", shape = "Respondents Browser Location"), color = "blue", size = 0.25, alpha = 0.5) + 
   geom_sf(data = ind_sf_intersect, aes(fill = "Respondents Qualtrics Location", shape = "Respondents Qualtrics Location"), color = "skyblue", size = 0.25, alpha = 0.2) + 
@@ -287,6 +293,378 @@ ggsave("~/Documents/GitHub/Adaptation_Observatory/response_analysis/results/resp
 ```
 
 # Geospatial Stat. Analysis 
+
+ I am trying to determine the distance from browser location and fb ad location for each ad dropped, but I don't think it makes the most sense to collect the distance of all points vs all ads bc they were likely not close enough to interact. So we're going to aggregate the bgd_sf_browser_intersect points using the strata bgd_fb_sf_buffered. these are two sf objects.
+
+```{r}
+distances <- st_distance(bgd_sf_browser_intersect, bgd_fb_sf_buffered)
+length(distances)
+```
+
+
+- Assigned unique stratum_id to all fb ads
+- Using knn, assigned panelist browser location to appropriate ad stratum_id 
+- Calculated the avg distance from ad location for each stratum_id
+- Used these avg in histogram to see avg distance distribution across all ads
+- Calculated the % of unique ad id's that were assigned to panelist browser , displayed as "Ad Success Rate"
+- All distances were less than 0.5 km for BGD
+- All distances were less than 2 km for IND 
+
+The ad success rates:
+
+BGD: 306/855 * 100 = 35.79 % of the respondents were within a 1 km distance
+
+IND: 184/850 * 100 = 19.37 % of the respondents were within a 2 km distance
+
+
+
+
+Follow up question I want to tackle over the weekend: on avg, how many responses per ad?
+
+I want a break down of the number of responses for each stratum_id
+
+```{r bgd_ad_strata_dist}
+library(dplyr)
+library(nngeo)
+
+# Add identifiers back to the buffered Facebook ad data
+bgd_fb_sf_buffered <- bgd_fb_sf_buffered %>%
+  mutate(stratum_id = row_number())
+
+bgd_fb_sf_buffered
+
+# Assuming bgd_sf_browser_intersect and bgd_fb_sf_buffered are your sf objects
+
+# Assign a unique stratum ID to each buffered ad zone
+bgd_fb_sf_buffered <- bgd_fb_sf_buffered %>%
+  mutate(stratum_id = row_number())
+
+# ---- knn assignment of stratum_id for ads ----
+# Find the nearest buffered Facebook ad zone for each browser location using KNN
+nearest_ad <- st_nn(bgd_sf_browser_intersect, bgd_fb_sf_buffered)
+
+length(unique(nearest_ad))
+
+# Join the browser locations with the nearest ad zones
+browser_with_ad <- bgd_sf_browser_intersect %>%
+  mutate(stratum_id = nearest_ad) %>%
+  # extract list contents
+  unnest(cols = stratum_id)
+  
+
+head(browser_with_ad, 5)
+colnames(browser_with_ad)
+# how many unique ad ids are represented here?
+# aka how successful were our 855 ads?
+# okay 306, not great, but not 0.
+length(unique(browser_with_ad$stratum_id))
+# our sucess rate here was 35.8
+ad_success_rate <- as.numeric(length(unique(browser_with_ad$stratum_id))) / as.numeric(length(bgd_fb_sf_buffered$stratum_id)) * 100
+
+
+# Check if any browser locations did not get assigned a stratum ID
+unassigned <- browser_with_ad[is.na(browser_with_ad$stratum_id), ]
+
+# If there are unassigned browser locations, handle them accordingly
+if (nrow(unassigned) > 0) {
+  # You can choose to assign a default stratum ID or handle them in another way
+  # For example:
+  browser_with_ad <- bind_rows(browser_with_ad, mutate(unassigned, stratum_id = NA))
+}
+
+unassigned
+# Now, every browser location should have a corresponding stratum ID
+
+# ---- distance calc for each ad strata ---- 
+# Calculate distance for each stratum_id group
+distance_table <- browser_with_ad %>%
+  group_by(stratum_id) %>%
+  # count how many responses per ad?
+  summarize(num_responses = n_distinct(response_id),
+            # calculate Mean distance in kilometers for each ad strata
+            distance_km = mean(sf::st_distance(geometry, bgd_fb_sf_buffered), na.rm = TRUE) / 1000) %>% 
+  mutate(distance_km = units::set_units(distance_km, "km")) 
+
+nrow(distance_table)
+
+distance_table
+
+
+# Calculate the maximum distance
+max_distance_bgd <- max(distance_table$distance_km)
+
+
+# Define breaks for binning
+breaks <- c(0, 0.3, 0.5, 1)
+
+# Create labels for the bins
+labels <- c("0-0.3 km","0.3-0.5 km", "0.5-1 km")
+
+# Cut the distances into bins
+distance_table <- distance_table %>%
+  mutate(distance_bin = cut(distance_km, breaks = breaks, labels = labels, include.lowest = TRUE))
+
+# Create the histogram
+bgd_hist <- ggplot(distance_table, aes(x = distance_bin)) +
+  
+  geom_bar(stat = "count", fill = "skyblue", color = "black") +
+  
+  labs( title = "BGD Mean Strata Distribution of Distances by Nearest Ad Location (km)",
+        subtitle = "Adaptation Observatory: April 15, 2024 Responses",
+        x = "Distance Range (km)",
+        y = "Frequency Count") +
+  
+  theme_minimal() +
+  
+  theme(
+    plot.title = element_text(size = 15,
+                              hjust = 0.5),
+    
+    plot.subtitle = element_text(size = 12,
+                                 hjust = 0.5),
+    
+    axis.text.x = element_text(hjust = 1)) +
+  
+  geom_rect(
+    aes(xmin = 2,
+        xmax = 3.5, 
+        ymin = 75, 
+        ymax = 125),
+    fill = "grey90",
+    color = "black",
+    size = 0.5,
+    inherit.aes = FALSE,
+    alpha = 0.1
+  ) +
+  # Add annotation
+  annotate(
+    "text",
+    x = 2.75, 
+    y = 85, 
+    label = paste0("Maximum distance is ", round(max_distance_bgd, 3), " (km)"),
+    hjust = 0.5,
+    vjust = -1,
+    color = "black",
+    size = 5
+  ) +
+  geom_curve(
+    aes(x = 2, y = 100, xend = 2, yend = 10),
+    curvature = 0.3,
+    color = "black",
+    arrow = arrow(length = unit(0.3, "cm"))
+  ) +
+  geom_text(
+    x = 2.75, 
+    y = 150, 
+    label = paste0("Ad Success Rate: ", round(ad_success_rate, 2), "%"),
+    hjust = 0.5,
+    vjust = -1,
+    color = "black",
+    size = 6
+  )
+
+bgd_hist
+
+ggsave(here("response_analysis/results/response_visuals/BGD/R1/clean_data_vis/bgd_R1_targeting_dist_hist.png"), plot = bgd_hist, width = 10, height = 7, dpi = 300, bg = "white")
+```
+
+```{r ind_ad_strata_dist}
+library(dplyr)
+library(nngeo)
+
+# Add identifiers back to the buffered Facebook ad data
+ind_fb_sf_buffered <- ind_fb_sf_buffered %>%
+  mutate(stratum_id = row_number())
+
+#ind_fb_sf_buffered
+
+# Assuming bgd_sf_browser_intersect and bgd_fb_sf_buffered are your sf objects
+
+# Assign a unique stratum ID to each buffered ad zone
+ind_fb_sf_buffered <- ind_fb_sf_buffered %>%
+  mutate(stratum_id = row_number())
+
+# ---- knn assignment of stratum_id for ads ----
+# Find the nearest buffered Facebook ad zone for each browser location using KNN
+nearest_ad_ind <- st_nn(ind_sf_browser_intersect, ind_fb_sf_buffered)
+
+#length(unique(nearest_ad))
+
+# Join the browser locations with the nearest ad zones
+browser_with_ad_ind <- ind_sf_browser_intersect %>%
+  mutate(stratum_id = nearest_ad_ind) %>%
+  # extract list contents
+  unnest(cols = stratum_id)
+  
+
+head(browser_with_ad_ind, 5)
+
+
+
+# how many unique ad ids are represented here?
+# aka how successful were our 950 ads?
+# okay 184, not great, but not 0.
+length(unique(browser_with_ad_ind$stratum_id))
+# our sucess rate here was 19.4
+ad_success_rate_ind <- as.numeric(length(unique(browser_with_ad_ind$stratum_id))) / as.numeric(length(ind_fb_sf_buffered$stratum_id)) * 100
+
+# Check if any browser locations did not get assigned a stratum ID
+unassigned_ind <- browser_with_ad_ind[is.na(browser_with_ad_ind$stratum_id), ]
+
+# If there are unassigned browser locations, handle them accordingly
+if (nrow(unassigned) > 0) {
+  # You can choose to assign a default stratum ID or handle them in another way
+  # For example:
+  browser_with_ad_ind <- bind_rows(browser_with_ad_ind, mutate(unassigned, stratum_id = NA))
+}
+
+unassigned_ind
+# Now, every browser location should have a corresponding stratum ID
+
+# ---- distance calc for each ad strata ---- 
+# Calculate distance for each stratum_id group
+distance_table_ind <- browser_with_ad_ind %>%
+  group_by(stratum_id) %>%
+  # count how many responses per ad?
+  summarize(num_responses = n_distinct(response_id),
+            # Mean distance in kilometers for each ad strata
+            distance_km = mean(sf::st_distance(geometry, ind_fb_sf_buffered), na.rm = TRUE) / 1000) %>% 
+  mutate(distance_km = units::set_units(distance_km, "km")) 
+
+
+
+nrow(distance_table_ind)
+
+distance_table_ind
+
+
+# Calculate the maximum distance
+max_distance <- max(distance_table_ind$distance_km)
+
+
+# Define breaks for binning
+breaks <- c(0, 0.3, 0.5, 1, 1.5, 2)
+
+# Create labels for the bins
+labels <- c("0-0.3 km","0.3-0.5 km", "0.5-1.0 km", "1.0-1.5 km", "1.5-2 km")
+
+# Cut the distances into bins
+distance_table_ind <- distance_table_ind %>%
+  mutate(distance_bin = cut(distance_km, breaks = breaks, labels = labels, include.lowest = TRUE))
+
+# Create the histogram
+ind_hist <- ggplot(distance_table_ind, aes(x = distance_bin)) +
+  
+  geom_bar(stat = "count", fill = "skyblue", color = "black") +
+  
+  labs( title = "IND Mean Strata Distribution of Distances by Nearest Ad (km)",
+        subtitle = "Adaptation Observatory: April 15, 2024 Responses",
+        x = "Distance Range (km)",
+        y = "Frequency Count") +
+  
+  theme_minimal() +
+  
+  theme(
+    plot.title = element_text(size = 15,
+                              hjust = 0.5),
+    
+    plot.subtitle = element_text(size = 12,
+                                 hjust = 0.5),
+    
+    axis.text.x = element_text(hjust = 1)) +
+  
+  geom_rect(
+    aes(xmin = 3,
+        xmax = 4.9, 
+        ymin = 45, 
+        ymax = 25),
+    fill = "grey90",
+    color = "black",
+    size = 0.5,
+    inherit.aes = FALSE,
+    alpha = 0.1
+  ) +
+  # Add annotation
+  annotate(
+    "text",
+    x = 3.95, 
+    y = 29, 
+    label = paste0("Maximum distance is ", round(max_distance, 2), " (km)"),
+    hjust = 0.5,
+    vjust = -1,
+    color = "black",
+    size = 5
+  ) +
+  geom_curve(
+    aes(x = 3, y = 35, xend = 2.8, yend = 10),
+    curvature = 0.3,
+    color = "black",
+    arrow = arrow(length = unit(0.3, "cm"))
+  ) +
+  geom_text(
+    x = 3.95, 
+    y = 55, 
+    label = paste0("Ad Success Rate: ", round(ad_success_rate_ind, 2), "%"),
+    hjust = 0.5,
+    vjust = -1,
+    color = "black",
+    size = 6
+  )
+
+ind_hist
+
+ggsave(here("response_analysis/results/response_visuals/IND/R1/clean_data_vis/ind_R1_targeting_dist_hist.png"), plot = ind_hist, width = 10, height = 7, dpi = 300, bg = "white")
+```
+
+```{r tot}
+# Create a table with total distances averaged
+# If you want total distances averaged, it's a bit different, here's how you can do it:
+total_distance <- sum(distance_table$distance_km)
+total_count <- nrow(distance_table)
+average_distance <- total_distance / total_count
+
+average_distance_table <- data.frame(total_distance = total_distance, total_count = total_count, average_distance = average_distance)
+```
+
+This workflow does include ads that did not have respondents associated to it. The length of this output is 855
+
+```{r}
+library(units)
+
+# Initialize an empty data frame to store the results
+distance_table2 <- data.frame(stratum_id = numeric(), distance_km = numeric())
+
+# Loop through each unique stratum_id
+for (stratum_id in unique(bgd_fb_sf_buffered$stratum_id)) {
+  # Subset browser_with_ad for the current stratum_id
+  subset_browser <- browser_with_ad[browser_with_ad$stratum_id == stratum_id, ]
+  # Subset bgd_fb_sf_buffered for the current stratum_id
+  subset_buffered <- bgd_fb_sf_buffered[bgd_fb_sf_buffered$stratum_id == stratum_id, ]
+  # Calculate distances between points in subset_browser and subset_buffered
+  distances2 <- st_distance(subset_browser$geometry, subset_buffered$geometry) / 1000  # Convert to kilometers
+  # Calculate the mean distance for this stratum_id
+  mean_distance <- mean(distances2, na.rm = TRUE)
+  # Append the result to the distance_table
+  distance_table2 <- rbind(distance_table2, data.frame(stratum_id = stratum_id, distance_km = mean_distance))
+}
+
+# Set units for distance_km
+distance_table2$distance_km <- units::set_units(distance_table2$distance_km, "km")
+
+
+distance_table2
+# Print distance_table
+print(distance_table2)
+```
+
+
+
+
+
+
+
+
+
 I want to create an object that only contains the points that overlap respondents browser location and targeted points
 
 I then want that object to compare the number of those observations we collected in the expected regions
@@ -374,6 +752,7 @@ rate_of_success_ind <- (success_count_ind / nrow(ind_expected_regions)) * 100
 
 rate_of_success_ind
 ```
+
 ```{r bgd_flood_exposure_response_rate}
 bgd_floods <-read_stars(here('../data/country_datas/bgd_flooding.tif')) 
 
@@ -409,18 +788,43 @@ st_crs(bgd_floods_1km) <- st_crs(bgd_sf_browser_intersect)
 # these are regions with flood exposure 
 subset_floods <- bgd_floods_1km[bgd_floods_1km$`band4` == TRUE, ] %>% 
   st_make_valid()
+```
 
+Joins are one of the most computationally taxing tools. When working with joins, it is always advised to aggregrate your data as much as possible prior to performing the join. This will simplify and reduce the amount of correlations the computer will have to sort though when pairing. If we tried to perform this spatial join without any aggregation prior, it would take a significantly long period of time 
+
+ideas:
+- unionize the true flood data
+- rasterize the true flood data
+- NOT useful was simplifying 
+
+```{r unionize}
+floods_unionized <- st_union(subset_floods) %>% 
+  st_make_valid()
+```
+
+```{r}
+st_crs(floods_unionized) <- st_crs(bgd_sf_browser_intersect)
+
+plot(floods_unionized)
+plot(bgd_sf_browser_intersect)
+```
+
+```{r bgd_flood_intersection}
 # Simplify geometries
-floods_simplified <- st_simplify(subset_floods) %>% 
-  st_make_valid()
+#floods_simplified <- st_simplify(subset_floods) %>% 
+ # st_make_valid()
 
+#obs_in_flood_regions_bgd <- st_intersection(bgd_sf_browser_intersect, floods_simplified)
 
-bgd_sf_browser_intersect <- bgd_sf_browser_intersect %>% 
-  st_make_valid()
+#bgd_sf_browser_intersect <- bgd_sf_browser_intersect %>% 
+ # st_make_valid()
 
 # Perform intersection to find points in flood prone regions
-obs_in_flood_regions_bgd <- st_intersection(bgd_sf_browser_intersect, floods_simplified)
+obs_in_flood_regions_bgd <- st_intersection(bgd_sf_browser_intersect, floods_unionized)
 
+obs_in_flood_regions_bgd <- st_intersection(floods_unionized, bgd_sf_browser_intersect)
+
+# ---- Calling cores and doing in parallel ----
 #library(foreach)
 #library(doParallel)
 
@@ -443,7 +847,7 @@ obs_in_flood_regions_bgd <- st_intersection(bgd_sf_browser_intersect, floods_sim
 # Stop parallel processing
 #stopCluster(cl)
 
-
+# ---- Counting observations ----
 # Step 2: Count observations in expected regions
 success_flood_count_bgd <- nrow(obs_in_flood_regions_bgd)
 failure_flood_count_bg <- nrow(subset_floods) - success_count_bgd
@@ -518,6 +922,11 @@ rate_of_success_floods_ind
 
 ```
 
+
+
+ALSO 
+
+Working on taking each respondents location and calculating the distance to the nearest sample point with histogram by dist. bins.
 
 ```{r}
 ```
