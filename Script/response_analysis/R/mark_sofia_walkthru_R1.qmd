@@ -1,0 +1,520 @@
+
+```{r set_up, message=FALSE, warning=FALSE}
+library(sf)
+library(here)
+library(tmap)
+library(terra)
+library(stars)
+library(leaflet)
+#library(maptiles)
+#library(devtools)
+#library(ggspatial)
+library(tmaptools)
+#library(patchwork)
+#library(sfheaders)
+library(tidyverse)
+#library(osmextract)
+#library(tidygeocoder)
+library(RColorBrewer)
+
+set.seed(99)
+```
+
+## Raw Response Data
+BGD raw = 4699
+IND raw = 8554
+```{r raw_responses}
+# read in data
+bgd_file <- file.path(here("..","data","adapt_observ_survey_responses", "Observatory_Bangladesh_2024_04_15.csv"))
+  
+ind_file <- file.path(here("..","data","adapt_observ_survey_responses", "Observatory_India_2024_04_15.csv"))
+
+bgd_raw <- read_csv(bgd_file, show_col_types = FALSE)
+  
+ind_raw <-read_csv(ind_file, show_col_types = FALSE)
+
+#bgd_raw_sf <- bgd_raw %>% 
+ # janitor::clean_names() %>% 
+  #filter(!is.na(geo_lng) & !is.na(geo_lat)) %>%
+  #st_as_sf(coords = c("geo_lng", "geo_lat"), crs = "EPSG:4326", na.rm = TRUE) %>% 
+  #st_make_valid()
+
+#ind_raw_sf <- ind_raw %>% 
+ # filter(!is.na(geo_lng) & !is.na(geo_lat)) %>%
+#  st_as_sf(coords = c("geo_lng", "geo_lat"), crs = "EPSG:4326") %>% 
+#  st_make_valid()
+```
+
+```{r target_points, message=FALSE, warning=FALSE}
+# Load in Border Shapefiles
+bgd_borders <- st_read(here("geospatial/country_shapefiles/geoBoundaries-BGD-ADM0-all/geoBoundaries-BGD-ADM0_simplified.shp"))
+
+ind_borders <- st_read(here("geospatial/country_shapefiles/geoBoundaries-IND-ADM0-all/geoBoundaries-IND-ADM0_simplified.shp"))
+
+# Import Facebook Point Targeting Data
+bgd_fb <- read.csv(here("geospatial/surveying_points/bgd_survey_strat_points_1km_95th.csv"))
+
+ind_fb <- read.csv(here("geospatial/surveying_points/ind_survey_strat_points_1km_95th.csv"))
+
+# Buffered target points 1 km
+bgd_fb_sf <- st_as_sf(bgd_fb, coords = c("X", "Y"), crs = 4326)
+bgd_fb_sf_buffered <- st_buffer(bgd_fb_sf, dist = units::set_units(1000, "m"))
+
+ind_fb_sf <- st_as_sf(ind_fb, coords = c("X", "Y"), crs = 4326)
+ind_fb_sf_buffered <- st_buffer(ind_fb_sf, dist = units::set_units(1000, "m"))
+```
+
+## Potential Panelist Data
+BGD cleaned = 930
+IND cleaned = 495
+```{r panelist_data, message=FALSE, warning=FALSE}
+# load BGD data 
+bgd <- read_csv("../results/clean_data/adaptation_observatory_bgd_cleaned_survey_questions_R1.csv",
+                show_col_types = FALSE)  %>% 
+  filter(complete.cases(location_longitude, location_latitude)) 
+  
+
+
+# load IND data 
+ind <- read_csv("../results/clean_data/adaptation_observatory_ind_cleaned_survey_questions_R1.csv",
+                show_col_types = FALSE) %>% 
+  filter(complete.cases(location_longitude, location_latitude)) 
+
+
+# ---- sf objects qualtrics location ----
+# create sf objects
+bgd_sf <- bgd %>% 
+  st_as_sf(coords = c("location_longitude", "location_latitude"), crs = "EPSG:4326") %>% 
+  st_make_valid()
+
+
+ind_sf <- ind %>% 
+  st_as_sf(coords = c("location_longitude", "location_latitude"), crs = "EPSG:4326") %>% 
+  st_make_valid() %>% 
+  filter(!is.na(geometry))
+
+
+# ---  sf objects browser location ----
+bgd_sf_browser <- bgd %>% 
+  filter(!is.na(geo_lng) & !is.na(geo_lat)) %>%
+  st_as_sf(coords = c("geo_lng", "geo_lat"), crs = "EPSG:4326") %>% 
+  st_make_valid()
+
+
+ind_sf_browser <- ind %>% 
+  filter(!is.na(geo_lng) & !is.na(geo_lat)) %>%
+  st_as_sf(coords = c("geo_lng", "geo_lat"), crs = "EPSG:4326") %>% 
+  st_make_valid()
+
+
+# Drop respondent locations outside of country boundaries
+bgd_sf_intersect <- st_intersection(bgd_sf, bgd_borders)
+bgd_sf_browser_intersect <- st_intersection(bgd_sf_browser, bgd_borders)
+
+ind_sf_intersect <- st_intersection(ind_sf, ind_borders)
+ind_sf_browser_intersect <- st_intersection(ind_sf_browser, ind_borders)
+```
+
+## Survey Location Accuracy 
+
+cleaned browser locations in country / total respondents
+
+BGD = 19.8%+≠
+IND = 5.9%
+```{r survey_accuracy}
+# cleaned browser locations in country / total respondents
+bgd_accuracy <-  nrow(bgd_sf_browser_intersect) / nrow(bgd_raw)* 100
+
+
+# cleaned browser locations in country 
+bin_accuracy <-  nrow(ind_sf_browser_intersect) / nrow(ind_raw)* 100
+```
+
+## KNN - needs some attention 
+**Pending updates upon touching base w/ Mark**
+I think bc the ad is buffered by 1 km, I need to at 1 km to all distances for this to be accurate
+
+- Assigned unique stratum_id to all fb ads
+- Using knn, assigned panelist browser location to appropriate ad stratum_id 
+- Calculated the avg distance from ad location for each stratum_id
+- Used these avg in histogram to see avg distance distribution across all ads
+- Calculated the % of unique ad id's that were assigned to panelist browser , displayed as "Ad Success Rate"
+- All distances were less than 0.5 km for BGD
+- All distances were less than 2 km for IND 
+
+The ad success rates:
+
+BGD: 306/855 * 100 = 35.79 % of the respondents were within a 1 km distance
+
+IND: 184/850 * 100 = 19.37 % of the respondents were within a 2 km distance
+
+
+Follow up question I want to tackle over the weekend: on avg, how many responses per ad?
+
+I want a break down of the number of responses for each stratum_id
+```{r bgd_knn}
+library(dplyr)
+library(nngeo)
+
+# Add identifiers back to the buffered Facebook ad data
+bgd_fb_sf_buffered <- bgd_fb_sf_buffered %>%
+  mutate(stratum_id = row_number())
+
+bgd_fb_sf_buffered
+
+# Assuming bgd_sf_browser_intersect and bgd_fb_sf_buffered are your sf objects
+
+# Assign a unique stratum ID to each buffered ad zone
+bgd_fb_sf_buffered <- bgd_fb_sf_buffered %>%
+  mutate(stratum_id = row_number())
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~
+#    MARK FOR INPUT
+#~~~~~~~~~~~~~~~~~~~~~~~~~
+# ---- knn assignment of stratum_id for ads ----
+# Find the nearest buffered Facebook ad zone for each browser location using KNN
+
+# these are 1 km buffered points, therefore, I believe the assumptions below may need adjustments
+# I think I need to adjust all of the distances in the histogram by +1 km
+# To get a more accurate calculation of distance
+
+nearest_ad <- st_nn(bgd_sf_browser_intersect, bgd_fb_sf_buffered)
+
+length(unique(nearest_ad))
+```
+```{r knn_check}
+#head(nearest_ad, 6)
+```
+
+```{r bgd_join}
+# Join the browser locations with the nearest ad zones
+browser_with_ad <- bgd_sf_browser_intersect %>%
+  mutate(stratum_id = nearest_ad) %>%
+  # extract list contents
+  unnest(cols = stratum_id)
+  
+
+head(browser_with_ad, 5)
+colnames(browser_with_ad)
+
+
+# how many unique ad ids are represented here?
+# aka how successful were our 855 ads?
+# okay 306, not great, but not 0.
+length(unique(browser_with_ad$stratum_id))
+```
+
+```{r}
+plot(browser_with_ad, col = browser_with_ad$stratum_id)
+```
+
+BGD ad success rate 35.8%
+```{r bgd_ad_success}
+# our sucess rate here was 35.8
+# unique ad ids that were assigned / total number of ads deployed
+ad_success_rate_bgd <- as.numeric(length(unique(browser_with_ad$stratum_id))) / as.numeric(length(bgd_fb_sf_buffered$stratum_id)) * 100
+
+as.numeric(length(unique(browser_with_ad$stratum_id)))
+
+as.numeric(length(bgd_fb_sf_buffered$stratum_id))
+```
+
+
+```{r bgd_check}
+# Check if any browser locations did not get assigned a stratum ID
+unassigned <- browser_with_ad[is.na(browser_with_ad$stratum_id), ]
+
+# If there are unassigned browser locations, handle them accordingly
+if (nrow(unassigned) > 0) {
+  # You can choose to assign a default stratum ID or handle them in another way
+  # For example:
+  browser_with_ad <- bind_rows(browser_with_ad, mutate(unassigned, stratum_id = NA))
+}
+
+unassigned
+# Now, every browser location should have a corresponding stratum ID
+```
+
+## Distance from Ads for Cleaned Browser Locations
+
+1. Adjust to mutate just for each distance and make hist for all distance distrib. 
+
+2. Facebook sampling points selected using the hpd+flood aoi : calculate the distance to the nearest point that is in that layer [mask + st_distance]
+(Accuracy )
+```{r bgd_dist}
+# ---- distance calc for each ad strata ---- 
+# Calculate distance for each stratum_id group
+distance_table_bgd <- browser_with_ad %>%
+  # for histogram, don't group,
+  # don't summarize
+  # just histogram
+  
+  
+#  group_by(stratum_id) %>%
+  # count how many responses per ad?
+ # summarize(#num_responses = n_distinct(response_id),
+            # calculate Mean distance in kilometers for each ad strata
+          # distance_km = mean(
+  mutate(distance_km = sf::st_distance(geometry, bgd_fb_sf_buffered), na.rm = TRUE) / 1000) %>% 
+  mutate(distance_km = units::set_units(distance_km, "km")) 
+
+nrow(distance_table_bgd)
+
+distance_table_bgd
+
+# Calculate the maximum distance
+max_distance_bgd <- max(distance_table_bgd$distance_km)
+
+max_distance_bgd
+```
+
+
+
+
+```{r bgd_hist}
+# Define breaks for binning
+breaks <- c(0, 0.3, 0.5, 1)
+
+# Create labels for the bins
+labels <- c("0-0.3 km","0.3-0.5 km", "0.5-1 km")
+
+# Cut the distances into bins
+distance_table <- distance_table %>%
+  mutate(distance_bin = cut(distance_km, breaks = breaks, labels = labels, include.lowest = TRUE))
+
+# Create the histogram
+bgd_hist <- ggplot(distance_table, aes(x = distance_bin)) +
+  
+  geom_bar(stat = "count", fill = "skyblue", color = "black") +
+  
+  labs( title = "BGD Mean Strata Distribution of Distances by Nearest Ad Location (km)",
+        subtitle = "Adaptation Observatory: April 15, 2024 Responses",
+        x = "Distance Range (km)",
+        y = "Frequency Count") +
+  
+  theme_minimal() +
+  
+  theme(
+    plot.title = element_text(size = 15,
+                              hjust = 0.5),
+    
+    plot.subtitle = element_text(size = 12,
+                                 hjust = 0.5),
+    
+    axis.text.x = element_text(hjust = 1)) +
+  
+  geom_rect(
+    aes(xmin = 2,
+        xmax = 3.5, 
+        ymin = 75, 
+        ymax = 125),
+    fill = "grey90",
+    color = "black",
+    size = 0.5,
+    inherit.aes = FALSE,
+    alpha = 0.1
+  ) +
+  # Add annotation
+  annotate(
+    "text",
+    x = 2.75, 
+    y = 85, 
+    label = paste0("Maximum distance is ", round(max_distance_bgd, 3), " (km)"),
+    hjust = 0.5,
+    vjust = -1,
+    color = "black",
+    size = 5
+  ) +
+  geom_curve(
+    aes(x = 2, y = 100, xend = 2, yend = 10),
+    curvature = 0.3,
+    color = "black",
+    arrow = arrow(length = unit(0.3, "cm"))
+  ) +
+  geom_text(
+    x = 2.75, 
+    y = 150, 
+    label = paste0("Ad Success Rate: ", round(ad_success_rate, 2), "%"),
+    hjust = 0.5,
+    vjust = -1,
+    color = "black",
+    size = 6
+  )
+
+bgd_hist
+
+ggsave(here("response_analysis/results/response_visuals/BGD/R1/clean_data_vis/bgd_R1_targeting_dist_hist.png"), plot = bgd_hist, width = 10, height = 7, dpi = 300, bg = "white")
+```
+
+```{r ind_ad_strata_dist}
+# Add identifiers back to the buffered Facebook ad data
+ind_fb_sf_buffered <- ind_fb_sf_buffered %>%
+  mutate(stratum_id = row_number())
+
+#ind_fb_sf_buffered
+
+# Assuming bgd_sf_browser_intersect and bgd_fb_sf_buffered are your sf objects
+
+# Assign a unique stratum ID to each buffered ad zone
+ind_fb_sf_buffered <- ind_fb_sf_buffered %>%
+  mutate(stratum_id = row_number())
+
+# ---- knn assignment of stratum_id for ads ----
+# Find the nearest buffered Facebook ad zone for each browser location using KNN
+nearest_ad_ind <- st_nn(ind_sf_browser_intersect, ind_fb_sf_buffered)
+
+#length(unique(nearest_ad))
+
+# Join the browser locations with the nearest ad zones
+browser_with_ad_ind <- ind_sf_browser_intersect %>%
+  mutate(stratum_id = nearest_ad_ind) %>%
+  # extract list contents
+  unnest(cols = stratum_id)
+  
+
+head(browser_with_ad_ind, 5)
+
+
+# how many unique ad ids are represented here?
+# aka how successful were our 950 ads?
+# okay 184, not great, but not 0.
+length(unique(browser_with_ad_ind$stratum_id))
+# our sucess rate here was 19.4
+ad_success_rate_ind <- as.numeric(length(unique(browser_with_ad_ind$stratum_id))) / as.numeric(length(ind_fb_sf_buffered$stratum_id)) * 100
+
+# Check if any browser locations did not get assigned a stratum ID
+unassigned_ind <- browser_with_ad_ind[is.na(browser_with_ad_ind$stratum_id), ]
+
+# If there are unassigned browser locations, handle them accordingly
+if (nrow(unassigned) > 0) {
+  # You can choose to assign a default stratum ID or handle them in another way
+  # For example:
+  browser_with_ad_ind <- bind_rows(browser_with_ad_ind, mutate(unassigned, stratum_id = NA))
+}
+
+unassigned_ind
+# Now, every browser location should have a corresponding stratum ID
+
+# ---- distance calc for each ad strata ---- 
+# Calculate distance for each stratum_id group
+distance_table_ind <- browser_with_ad_ind %>%
+  group_by(stratum_id) %>%
+  # count how many responses per ad?
+  summarize(num_responses = n_distinct(response_id),
+            # Mean distance in kilometers for each ad strata
+            distance_km = mean(sf::st_distance(geometry, ind_fb_sf_buffered), na.rm = TRUE) / 1000) %>% 
+  mutate(distance_km = units::set_units(distance_km, "km")) 
+
+
+
+nrow(distance_table_ind)
+
+distance_table_ind
+
+
+# Calculate the maximum distance
+max_distance_ind <- max(distance_table_ind$distance_km)
+max_distance_ind
+```
+
+
+```{r ind_hist}
+# Define breaks for binning
+breaks <- c(0, 0.3, 0.5, 1, 1.5, 2)
+
+# Create labels for the bins
+labels <- c("0-0.3 km","0.3-0.5 km", "0.5-1.0 km", "1.0-1.5 km", "1.5-2 km")
+
+# Cut the distances into bins
+distance_table_ind <- distance_table_ind %>%
+  mutate(distance_bin = cut(distance_km, breaks = breaks, labels = labels, include.lowest = TRUE))
+
+# Create the histogram
+ind_hist <- ggplot(distance_table_ind, aes(x = distance_bin)) +
+  
+  geom_bar(stat = "count", fill = "skyblue", color = "black") +
+  
+  labs( title = "IND Mean Strata Distribution of Distances by Nearest Ad (km)",
+        subtitle = "Adaptation Observatory: April 15, 2024 Responses",
+        x = "Distance Range (km)",
+        y = "Frequency Count") +
+  
+  theme_minimal() +
+  
+  theme(
+    plot.title = element_text(size = 15,
+                              hjust = 0.5),
+    
+    plot.subtitle = element_text(size = 12,
+                                 hjust = 0.5),
+    
+    axis.text.x = element_text(hjust = 1)) +
+  
+  geom_rect(
+    aes(xmin = 3,
+        xmax = 4.9, 
+        ymin = 45, 
+        ymax = 25),
+    fill = "grey90",
+    color = "black",
+    size = 0.5,
+    inherit.aes = FALSE,
+    alpha = 0.1
+  ) +
+  # Add annotation
+  annotate(
+    "text",
+    x = 3.95, 
+    y = 29, 
+    label = paste0("Maximum distance is ", round(max_distance, 2), " (km)"),
+    hjust = 0.5,
+    vjust = -1,
+    color = "black",
+    size = 5
+  ) +
+  geom_curve(
+    aes(x = 3, y = 35, xend = 2.8, yend = 10),
+    curvature = 0.3,
+    color = "black",
+    arrow = arrow(length = unit(0.3, "cm"))
+  ) +
+  geom_text(
+    x = 3.95, 
+    y = 55, 
+    label = paste0("Ad Success Rate: ", round(ad_success_rate_ind, 2), "%"),
+    hjust = 0.5,
+    vjust = -1,
+    color = "black",
+    size = 6
+  )
+
+ind_hist
+
+ggsave(here("response_analysis/results/response_visuals/IND/R1/clean_data_vis/ind_R1_targeting_dist_hist.png"), plot = ind_hist, width = 10, height = 7, dpi = 300, bg = "white")
+```
+
+Total Distance
+**NOT READY YET**
+I think bc the ad is buffered by 1 km, I need to at 1 km to all distances for this to be accurate
+
+```{r tot_distance}
+# Create a table with total distances averaged
+# If you want total distances averaged, it's a bit different, here's how you can do it:
+total_distance_bgd <- sum(distance_table_bgd$distance_km)
+total_count_bgd <- nrow(distance_table_bgd)
+average_distance_bgd <- total_distance_bgd / total_count_bgd
+
+average_distance_table_bgd <- data.frame(total_distance = total_distance_bgd, total_count = total_count_bgd, average_distance = average_distance_bgd)
+
+
+#INDIA
+# Create a table with total distances averaged
+# If you want total distances averaged, it's a bit different, here's how you can do it:
+total_distance_ind <- sum(distance_table_ind$distance_km)
+total_count_ind <- nrow(distance_table_ind)
+average_distance_ind <- total_distance_ind / total_count_ind
+
+average_distance_table_ind <- data.frame(total_distance = total_distance_ind, total_count = total_count_ind, average_distance = average_distance_ind)
+
+average_distance_table_ind
+```

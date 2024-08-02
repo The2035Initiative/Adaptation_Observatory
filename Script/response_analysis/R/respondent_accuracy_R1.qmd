@@ -1,0 +1,104 @@
+```{r}
+library(tidyverse)
+library(sf)
+```
+
+```{r potential_panelist, warning = FALSE, message=FALSE}
+# Import Facebook Point Targeting Data
+bgd_fb <- read.csv(here("geospatial/surveying_points/bgd_survey_strat_points_1km_95th.csv"))
+
+ind_fb <- read.csv(here("geospatial/surveying_points/ind_survey_strat_points_1km_95th.csv"))
+
+bgd_fb_sf <- st_as_sf(bgd_fb, coords = c("X", "Y"), crs = 4326)
+bgd_fb_sf_buffered <- st_buffer(bgd_fb_sf, dist = units::set_units(1000, "m"))
+
+ind_fb_sf <- st_as_sf(ind_fb, coords = c("X", "Y"), crs = 4326)
+ind_fb_sf_buffered <- st_buffer(ind_fb_sf, dist = units::set_units(1000, "m"))
+
+# Load in Border Shapefiles
+bgd_borders <- st_read(here("geospatial/country_shapefiles/geoBoundaries-BGD-ADM0-all/geoBoundaries-BGD-ADM0_simplified.shp"))
+
+ind_borders <- st_read(here("geospatial/country_shapefiles/geoBoundaries-IND-ADM0-all/geoBoundaries-IND-ADM0_simplified.shp"))
+
+
+# load BGD data 
+bgd <- read_csv("../results/clean_data/adaptation_observatory_bgd_cleaned_survey_questions_R1.csv",
+                show_col_types = FALSE)  %>% 
+  filter(complete.cases(location_longitude, location_latitude)) 
+  
+
+
+# load IND data 
+ind <- read_csv("../results/clean_data/adaptation_observatory_ind_cleaned_survey_questions_R1.csv",
+                show_col_types = FALSE) %>% 
+  filter(complete.cases(location_longitude, location_latitude)) 
+
+# ---  sf objects browser location ----
+bgd_sf_browser <- bgd %>% 
+  filter(!is.na(geo_lng) & !is.na(geo_lat)) %>%
+  st_as_sf(coords = c("geo_lng", "geo_lat"), crs = "EPSG:4326") %>% 
+  st_make_valid()
+
+
+ind_sf_browser <- ind %>% 
+  filter(!is.na(geo_lng) & !is.na(geo_lat)) %>%
+  st_as_sf(coords = c("geo_lng", "geo_lat"), crs = "EPSG:4326") %>% 
+  st_make_valid()
+
+
+# Drop respondent locations outside of country boundaries
+bgd_sf_browser_intersect <- st_intersection(bgd_sf_browser, bgd_borders)
+
+ind_sf_browser_intersect <- st_intersection(ind_sf_browser, ind_borders)
+```
+
+
+```{r raw_data, warning = FALSE, message=FALSE}
+# ---  sf objects browser location ----
+# RAW DATA
+bgd_responses <- bgd_responses %>% 
+  filter(!is.na(geo_lng) & !is.na(geo_lat)) %>% 
+  na.omit(geo_lat, geo_lng) %>% 
+  st_as_sf(coords = c("geo_lng", "geo_lat"), crs = "EPSG:4326") 
+
+
+bgd_sf_browser <- bgd_responses %>% 
+  filter(!is.na(geo_lng) & !is.na(geo_lat)) %>%
+  st_as_sf(coords = c("geo_lng", "geo_lat"), crs = "EPSG:4326") %>% 
+  st_make_valid()
+
+
+ind_sf_browser <- ind_responses %>% 
+  filter(!is.na(geo_lng) & !is.na(geo_lat)) %>%
+  st_as_sf(coords = c("geo_lng", "geo_lat"), crs = "EPSG:4326") %>% 
+  st_make_valid()
+
+
+# Drop respondent locations outside of country boundaries
+bgd_sf_browser_intersect <- st_intersection(bgd_sf_browser, bgd_borders)
+
+ind_sf_browser_intersect <- st_intersection(ind_sf_browser, ind_borders)
+```
+
+```{r total_respondents}
+bgd_file <- file.path(here("..","data","adapt_observ_survey_responses", "Observatory_Bangladesh_2024_04_15.csv"))
+  
+ind_file <- file.path(here("..","data","adapt_observ_survey_responses", "Observatory_India_2024_04_15.csv"))
+
+# 4699 responses, uncleaned/raw
+bgd_responses <- read_csv(bgd_file, show_col_types = FALSE)
+# 8554 responses, uncleaned/raw  
+ind_responses <-read_csv(ind_file, show_col_types = FALSE)
+```
+
+```{r bgd_response_accuracy}
+# dividing 930 potential panelists / total bgd respondents 4699
+# 19.8% location=hpd+flood accuracy 
+bgd_response_accuracy <- nrow(bgd_sf_browser_intersect) / nrow(bgd_responses) * 100
+```
+
+```{r ind_response_accuracy}
+# dividing 495 potential panelists / total bgd respondents 8554
+# 5.8% location=hpd+flood accuracy 
+ind_response_accuracy <- nrow(ind_sf_browser_intersect) / nrow(ind_responses) * 100
+```

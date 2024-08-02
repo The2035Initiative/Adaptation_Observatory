@@ -1,13 +1,13 @@
 {
     "sortOrder": [
         {
-            "columnIndex": 4,
+            "columnIndex": 2,
             "ascending": true
         },
         {
-            "columnIndex": 2,
+            "columnIndex": 4,
             "ascending": true
         }
     ],
-    "path": "~/2035/Adaptation_Observatory/response_analysis/results/response_visuals/IND/R1/clean_data_vis"
+    "path": "~/2035/Adaptation_Observatory/Script/geospatial/GIS_identification_aoi_to_survey"
 }
