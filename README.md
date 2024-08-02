@@ -4,6 +4,12 @@
 ### Overview
 In order to design effective policies and interventions, it is essential to understand how vulnerable people respond to climate-related shocks. However, barriers such as the high mobility typically associated with informal settlements, make it difficult to survey the same people consistently. Furthermore, a large distribution of vulnerable women, and migrants face a wide breadth of social and economic barriers that prevent them from participating in in-person surveys, as a result of safety and privacy concerns. As a result, there is a social data gap related to how residents are responding to climate-related shocks and the types of information they require to prepare better and advocate for their interests with relevant government agencies. To address this data inequality, a proof-of-concept system of high-frequency data collection with climate-vulnerable populations is underway. This is to better understand how vulnerable people around the world are coping with climate risks. We are seeking to identify which populations are in greatest need of assistance, and how policies that extend public services build resilience (Buntaine 2023).
 
+![image](https://github.com/user-attachments/assets/7999e6d0-5929-4e0c-b9b3-8e5794036d7a)
+
+In June of 2022, 80% of the residents in Sylhet, Bangladesh were flooded. Sylhet contains half a million people and sits on the eastern side of Bangladesh, on the Surma River. Above we can see the resilence residents relied on for transportation [(The New Humanitarian 2022).](https://www.thenewhumanitarian.org/photo-feature/2022/07/05/floods-climate-change-india-bangladesh-natural-disasters)
+
+
+
 #### Population Data
 - [Bangladesh Population Density Data](https://data.humdata.org/dataset/worldpop-population-density-for-bangladesh)
 - [India Population Density Data](https://data.humdata.org/dataset/worldpop-population-density-for-india)
